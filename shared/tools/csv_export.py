@@ -27,3 +27,7 @@ def build_safe_csv(rows: list[dict[str, Any]]) -> str:
     for row in rows:
         writer.writerow({col: row.get(col, "") for col in REQUIRED_COLUMNS})
     return buffer.getvalue()
+
+
+def leads_to_csv(leads: list[dict[str, Any]]) -> str:
+    return build_safe_csv(leads)
