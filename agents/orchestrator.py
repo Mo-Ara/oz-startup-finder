@@ -40,7 +40,6 @@ class OzStartupFinderPipeline:
     async def run(self, user_query: str) -> PipelineState:
         self.state.user_query = user_query
         clarifying_session = Runner(
-            agent_name=self.clarifying_agent.name,
             agent=self.clarifying_agent,
             session_service=self.session_service,
             session_id=f"{self.session_id}:clarifying",
@@ -51,7 +50,6 @@ class OzStartupFinderPipeline:
             return self.state
 
         router_session = Runner(
-            agent_name=self.router_agent.name,
             agent=self.router_agent,
             session_service=self.session_service,
             session_id=f"{self.session_id}:router",
@@ -60,7 +58,6 @@ class OzStartupFinderPipeline:
         self._assign("router_output", getattr(router_out, "structured_output", {}))
 
         retriever_session = Runner(
-            agent_name=self.retriever_agent.name,
             agent=self.retriever_agent,
             session_service=self.session_service,
             session_id=f"{self.session_id}:retriever",
@@ -71,7 +68,6 @@ class OzStartupFinderPipeline:
         enriched: list[dict] = []
         for candidate in self.state.retrieved_candidates[:10]:
             enriched_session = Runner(
-                agent_name=self.enricher_agent.name,
                 agent=self.enricher_agent,
                 session_service=self.session_service,
                 session_id=f"{self.session_id}:enricher:{candidate.get('company_name', 'unknown')}",
