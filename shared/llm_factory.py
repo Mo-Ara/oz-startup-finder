@@ -29,3 +29,6 @@ def get_client() -> AsyncOpenAI:
         max_retries=cfg.max_retries,
         timeout=cfg.request_timeout,
     )
+
+
+get_llm = get_client
