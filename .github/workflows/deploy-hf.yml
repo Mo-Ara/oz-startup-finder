@@ -27,4 +27,11 @@ jobs:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_SPACE_REPO_ID: ${{ secrets.HF_SPACE_REPO_ID }}
         run: |
-          huggingface-cli upload "$HF_SPACE_REPO_ID" Dockerfile README.md ui requirements.txt deploy/ui/app.py . --repo-type space
+          hf upload "$HF_SPACE_REPO_ID" \
+            Dockerfile README.md app.py requirements.txt \
+            agents shared ui scripts tests docs shared tools \
+            --repo-type space \
+            --ignore "*.db" \
+            --ignore "*.csv" \
+            --ignore ".git/*" \
+            --ignore ".venv/*"
