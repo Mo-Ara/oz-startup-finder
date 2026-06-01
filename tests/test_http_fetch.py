@@ -13,7 +13,9 @@ def mock_client(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     mock_response.status_code = 200
     mock_response.url = "https://testco.example.com"
     mock.get = AsyncMock(return_value=mock_response)
-    mock.close = AsyncMock()
+    mock.close = AsyncMock(return_value=None)
+    mock.__aenter__ = AsyncMock(return_value=mock)
+    mock.__aexit__ = AsyncMock(return_value=False)
     monkeypatch.setattr("shared.tools.http_fetch.httpx.AsyncClient", lambda **kwargs: mock)
     return mock
 

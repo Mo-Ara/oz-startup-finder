@@ -10,6 +10,7 @@ VALID_ROW = {
     "company_number_of_employees": "11-50",
     "industry": "Developer Tools",
     "company_city": "Sydney",
+    "company_state": "NSW",
     "company_logo_url": "https://acme-ai.example.com/logo.png",
 }
 

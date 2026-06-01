@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import sqlite3
+import os
 from pathlib import Path
+import sqlite3
 from typing import Any
 
 
@@ -29,17 +30,17 @@ def search_companies(
         cursor = conn.execute(
             """
             SELECT
-                company_name,
-                company_website,
-                company_linkedin,
-                company_number_of_employees,
-                industry,
-                company_city,
-                company_state,
-                company_logo_url,
+                c.company_name,
+                c.company_website,
+                c.company_linkedin,
+                c.company_number_of_employees,
+                c.industry,
+                c.company_city,
+                c.company_state,
+                c.company_logo_url,
                 bm25(companies_fts) AS rank
-            FROM companies
-            JOIN companies_fts ON companies.rowid = companies_fts.rowid
+            FROM companies AS c
+            JOIN companies_fts ON c.rowid = companies_fts.rowid
             WHERE companies_fts MATCH ?
             ORDER BY rank
             LIMIT ? OFFSET ?

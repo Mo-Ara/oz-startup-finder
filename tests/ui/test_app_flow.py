@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 import pytest
 import pytest_asyncio
 from agents.orchestrator import OzStartupFinderPipeline
@@ -22,6 +24,8 @@ def pipeline_factory():
 
 @pytest.mark.asyncio
 async def test_orchestrator_reaches_synthesis(pipeline_factory):
+    if not os.environ.get("OPENROUTER_API_KEY"):
+        pytest.skip("OPENROUTER_API_KEY required for orchestrator integration test")
     pipeline = pipeline_factory()
     state = await pipeline.run("Find Melbourne-based code review tools")
 
@@ -34,3 +38,5 @@ async def test_orchestrator_reaches_synthesis(pipeline_factory):
     if leads:
         first = leads[0]
         assert "company_name" in first
+        assert "relevance_narrative" in first
+        assert "confidence" in first
