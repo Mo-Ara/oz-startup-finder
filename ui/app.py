@@ -26,14 +26,22 @@ def format_results(state: PipelineState) -> str:
     leads_md = ["## Summary", summary or "_Waiting for pipeline output._"]
 
     for lead in state.synthesis.get("leads_json", [])[:20]:
-        location = ", ".join(filter(None, [lead.get("company_city"), lead.get("company_state")]))
+        location = ", ".join(
+            filter(
+                None,
+                [
+                    lead.get("company_city"),
+                    lead.get("company_state"),
+                ],
+            )
+        )
         leads_md.append(
             "- "
             + ", ".join(
                 filter(
                     None,
                     [
-                        f"**{lead.get('company_name')}**",
+                        f"**{lead.get('company_name', 'Unnamed')}**",
                         lead.get("industry"),
                         location or None,
                         f"relevance {lead.get('relevance_score')}",
@@ -49,7 +57,7 @@ def format_results(state: PipelineState) -> str:
     return "\n".join(leads_md)
 
 
-async def run_workflow(query: str) -> tuple[str, str, str]:
+async def run_workflow(query: str):
     pipeline = OzStartupFinderPipeline()
     state = await pipeline.run(query)
     trace_text = "\n".join(build_workflow_steps(state))
@@ -64,10 +72,9 @@ def export_csv(state: PipelineState) -> str:
     leads = state.synthesis.get("leads_json", [])
     if not leads:
         return "No results to export."
-
     try:
         return leads_to_csv(leads)
-    except Exception as exc:  # pragma: no cover
+    except Exception as exc:
         return f"Export failed: {exc}"
 
 
