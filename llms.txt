@@ -1,0 +1,26 @@
+oz-startup-finder
+
+:summary: Agentic startup research tool with 6 Google ADK agents.
+:stack: google-adk, gradio, sqlite, openai-api
+
+Agents:
+- clarifying
+- router
+- retriever
+- enricher
+- scorer
+- synthesizer
+
+Patterns:
+- human-in-the-loop
+- router
+- RAG
+- parallel fan-out
+- evaluator-optimizer
+- structured output
+
+Docs:
+- README.md: overview + architecture
+- docs/deploy.md: deployment guidance
+- ACTION_PLAN.md: roadmap
+- PRD.md: product requirements
