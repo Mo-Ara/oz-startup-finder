@@ -44,14 +44,15 @@ class OzStartupFinderPipeline:
             session_service=InMemorySessionService(),
             app_name="oz-startup-finder",
         )
-        await clarifying_session.run(
+        clarifying_out = await _run_agent(
+            clarifying_session,
             user_id="local-user",
             session_id=f"{self.session_id}:clarifying",
             new_message=user_query,
         )
         self._assign(
             "clarifying_questions",
-            getattr(clarifying_session, "follow_up_questions", []),
+            getattr(clarifying_out, "follow_up_questions", []),
         )
         if self._needs_clarification():
             return self.state
@@ -61,10 +62,15 @@ class OzStartupFinderPipeline:
             session_service=InMemorySessionService(),
             app_name="oz-startup-finder",
         )
-        await router_session.run()
+        router_out = await _run_agent(
+            router_session,
+            user_id="local-user",
+            session_id=f"{self.session_id}:router",
+            new_message=user_query,
+        )
         self._assign(
             "router_output",
-            getattr(router_session, "structured_output", {}),
+            getattr(router_out, "structured_output", {}),
         )
 
         retriever_session = Runner(
@@ -72,10 +78,15 @@ class OzStartupFinderPipeline:
             session_service=InMemorySessionService(),
             app_name="oz-startup-finder",
         )
-        await retriever_session.run()
+        retriever_out = await _run_agent(
+            retriever_session,
+            user_id="local-user",
+            session_id=f"{self.session_id}:retriever",
+            new_message=user_query,
+        )
         self._assign(
             "retrieved_candidates",
-            getattr(retriever_session, "top_matches", []),
+            getattr(retriever_out, "top_matches", []),
         )
 
         enriched: list[dict] = []
@@ -85,8 +96,13 @@ class OzStartupFinderPipeline:
                 session_service=InMemorySessionService(),
                 app_name="oz-startup-finder",
             )
-            await enriched_session.run()
-            payload = getattr(enriched_session, "structured_output", {})
+            enriched_out = await _run_agent(
+                enriched_session,
+                user_id="local-user",
+                session_id=f"{self.session_id}:enricher:{candidate.get('company_name', 'unknown')}",
+                new_message=user_query,
+            )
+            payload = getattr(enriched_out, "structured_output", {})
             payload.setdefault("company_name", candidate.get("company_name"))
             enriched.append(payload)
         self._assign("enriched_leads", enriched)
@@ -96,10 +112,15 @@ class OzStartupFinderPipeline:
             session_service=InMemorySessionService(),
             app_name="oz-startup-finder",
         )
-        await scorer_session.run()
+        scorer_out = await _run_agent(
+            scorer_session,
+            user_id="local-user",
+            session_id=f"{self.session_id}:scorer",
+            new_message=user_query,
+        )
         self._assign(
             "scored_leads",
-            getattr(scorer_session, "scored_leads", []),
+            getattr(scorer_out, "scored_leads", []),
         )
 
         synthesizer_session = Runner(
@@ -107,10 +128,15 @@ class OzStartupFinderPipeline:
             session_service=InMemorySessionService(),
             app_name="oz-startup-finder",
         )
-        await synthesizer_session.run()
+        synthesizer_out = await _run_agent(
+            synthesizer_session,
+            user_id="local-user",
+            session_id=f"{self.session_id}:synthesizer",
+            new_message=user_query,
+        )
         self._assign(
             "synthesis",
-            getattr(synthesizer_session, "structured_output", {}),
+            getattr(synthesizer_out, "structured_output", {}),
         )
 
         return self.state
@@ -120,3 +146,14 @@ class OzStartupFinderPipeline:
 
     def _assign(self, field_name: str, value: object) -> None:
         object.__setattr__(self.state, field_name, value)
+
+
+async def _run_agent(runner: Runner, *, user_id: str, session_id: str, new_message: str):
+    last = None
+    async for event in runner.run_async(
+        user_id=user_id,
+        session_id=session_id,
+        new_message=new_message,
+    ):
+        last = event
+    return last
