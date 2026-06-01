@@ -1,113 +1,53 @@
 # oz-startup-finder
 
-Agentic research tool that finds relevant Australian early-stage startups from an 8k-company knowledge base, using semantic search, parallel enrichment, and relevance scoring — built with Google ADK.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Built to showcase the full range of ADK agent patterns in one coherent workflow. Designed to be free to run and easy to deploy.
+An agentic research tool that finds relevant Australian early-stage startups from an 8k-company knowledge base. Built with Google ADK, Gradio, and SQLite FTS5.
 
-> **Live demo:** _(coming soon — HuggingFace Spaces)_
+## Why this repo exists
 
----
+This project showcases a full agentic pipeline in one workflow:
+human-in-the-loop clarification, routing, retrieval, parallel enrichment, evaluator-optimizer scoring, and structured output.
 
-## How it works
+## Architecture
 
+```text
+User Query
+  |
+  v
+[1] Clarifying Agent      -> narrow the intent
+[2] Router Agent          -> classify + choose search strategy
+[3] Retriever Agent       -> SQLite FTS5 candidate search
+[4] Enricher Agent        -> parallel relevance narratives
+[5] Scorer Agent          -> relevance + confidence scoring
+[6] Synthesizer Agent     -> final structured output
+  |
+  v
+Gradio UI -> table + cards + CSV export
 ```
-User query + clarifying questions
-  → Router (classify intent)
-  → RAG / FTS5 search over 8k companies
-  → Parallel enrichment of top candidates
-  → Evaluator-optimizer scoring loop
-  → Structured output: table + CSV export + per-company cards
-```
 
-Eight ADK patterns in one pipeline:
+## Tech Stack
 
-| Pattern | Where |
-|---------|-------|
-| Human-in-the-loop | Clarifying questions; approve / discard results |
-| Router | Classify query: company lookup vs. market scan vs. competitor research |
-| RAG (FTS5 + optional embeddings) | Semantic search over 8k company metadata |
-| Parallel fan-out | Enrich top 10 leads concurrently |
-| Sequential pipeline | Per-lead enrichment chain: fetch → extract → score → format |
-| Evaluator-optimizer | Relevance scoring refinement loop |
-| Structured output | JSON schema enforced, CSV export, markdown report |
-| Tool use | SQLite queries, HTTP fetch, OpenRouter extraction |
+- Google ADK (Python)
+- Gradio 5.x
+- SQLite + FTS5
+- OpenRouter free models
+- GitHub Actions
+- Docker
 
----
+## Data
 
-## Tech stack
+Private company data is **not** in this repo.
+Build `data/startups.db` locally with `scripts/seed_demo.py` or `scripts/build_knowledge_base.py`.
+`data/*.db` and `data/*.csv` are gitignored.
 
-| Layer | Tool |
-|-------|------|
-| Agent framework | Google ADK (Python) |
-| UI | Gradio |
-| LLM | OpenRouter (free models) |
-| Data | SQLite + FTS5 |
-| Container | Docker |
-| CI / Deploy | GitHub Actions → HuggingFace Spaces |
-
-**Cost: $0/month** (free tiers across the board).
-
----
-
-## Local development
-
-### 1. Clone
+## Quick Start
 
 ```bash
-git clone https://github.com/<your-username>/oz-startup-finder.git
-cd oz-startup-finder
-```
-
-### 2. Set up environment
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-### 3. Build the knowledge base
-
-```bash
-python scripts/build_knowledge_base.py /path/to/your/companies.csv
-```
-
-This creates `data/startups.db` (gitignored, never committed).
-
-### 4. Run the app
-
-```bash
+python -m scripts.seed_demo
 python ui/app.py
 ```
 
----
+## Live Demo
 
-## Data privacy
-
-This repo contains **application code only** — no raw company data.
-
-- `data/startups.db` is gitignored and must be built locally from your CSV.
-- The agent is explicitly instructed never to echo raw company descriptions.
-- The output schema has no `description` field.
-- No CSV download or bulk-export of raw data is available in the UI.
-
-Forks and clones get the full app but zero access to the private knowledge base.
-
----
-
-## Project docs
-
-- `PRD.md` — product requirements, architecture, cost analysis, decision log
-- `ACTION_PLAN.md` — phase-by-phase build tracker
-
----
-
-## License
-
-MIT — see `LICENSE`
-
----
-
-## Status
-
-🚧 Under active construction — Phases 0–1 in progress.
+Coming soon.
