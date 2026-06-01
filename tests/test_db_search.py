@@ -31,6 +31,7 @@ def test_db_get_company_existing():
     result = db_get_company("Acme AI")
     assert result is not None
     assert result["found"] is True
+    assert result["company_name"] == "Acme AI"
 
 
 def test_db_get_company_missing():
