@@ -8,6 +8,31 @@ REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
+# Runtime diagnostic for the installed google-adk package.
+# Prints to the Space build/run log so we can see the actual API surface.
+try:
+    import google.adk as _adk_root
+    print("ADK_DIAG google.adk=", getattr(_adk_root, "__version__", "unknown"))
+except Exception as exc:  # pragma: no cover - diagnostic only
+    print("ADK_DIAG google.adk import failed:", exc)
+
+try:
+    from google.adk import Runner
+    print("ADK_DIAG Runner import ok")
+    print("ADK_DIAG Runner init params:", getattr(Runner.__init__, "__code__", None))
+    if hasattr(Runner, "run"):
+        print("ADK_DIAG Runner.run signature:", getattr(Runner.run, "__code__", None))
+    if hasattr(Runner, "run_async"):
+        print("ADK_DIAG Runner.run_async signature:", getattr(Runner.run_async, "__code__", None))
+except Exception as exc:  # pragma: no cover - diagnostic only
+    print("ADK_DIAG Runner inspection failed:", exc)
+
+try:
+    from google.adk.agents import LlmAgent
+    print("ADK_DIAG LlmAgent fields:", getattr(LlmAgent, "model_fields", None))
+except Exception as exc:  # pragma: no cover - diagnostic only
+    print("ADK_DIAG LlmAgent inspection failed:", exc)
+
 import gradio as gr  # noqa: E402
 from agents.orchestrator import OzStartupFinderPipeline  # noqa: E402
 
