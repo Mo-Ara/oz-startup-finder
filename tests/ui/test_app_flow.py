@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+import pytest_asyncio
 from agents.orchestrator import OzStartupFinderPipeline
 from google.adk.sessions import InMemorySessionService
 
@@ -19,7 +20,8 @@ def pipeline_factory():
     return build
 
 
-def test_orchestrator_reaches_synthesis(pipeline_factory):
+@pytest.mark.asyncio
+async def test_orchestrator_reaches_synthesis(pipeline_factory):
     pipeline = pipeline_factory()
     state = await pipeline.run("Find Melbourne-based code review tools")
 
