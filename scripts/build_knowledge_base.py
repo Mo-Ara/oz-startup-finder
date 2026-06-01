@@ -16,7 +16,8 @@ def build_knowledge_base(csv_path: Path, db_path: Path) -> None:
 
     conn = sqlite3.connect(str(db_path))
     try:
-        conn.execute("""
+        conn.execute(
+            """
             CREATE TABLE companies (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 company_name TEXT NOT NULL,
@@ -26,34 +27,43 @@ def build_knowledge_base(csv_path: Path, db_path: Path) -> None:
                 company_description TEXT,
                 industry TEXT,
                 company_city TEXT,
+                company_state TEXT,
                 company_logo_url TEXT
             )
-        """)
+            """
+        )
 
-        conn.execute("""
+        conn.execute(
+            """
             CREATE VIRTUAL TABLE companies_fts USING fts5(
                 company_name,
                 industry,
                 company_city,
+                company_state,
                 company_description,
                 content=companies,
                 content_rowid=id
             )
-        """)
+            """
+        )
 
-        conn.execute("""
+        conn.execute(
+            """
             CREATE TRIGGER companies_ai AFTER INSERT ON companies BEGIN
-                INSERT INTO companies_fts(rowid, company_name, industry, company_city, company_description)
-                VALUES (new.id, new.company_name, new.industry, new.company_city, new.company_description);
+                INSERT INTO companies_fts(rowid, company_name, industry, company_city, company_state, company_description)
+                VALUES (new.id, new.company_name, new.industry, new.company_city, new.company_state, new.company_description);
             END
-        """)
+            """
+        )
 
-        conn.execute("""
+        conn.execute(
+            """
             CREATE TRIGGER companies_ad AFTER DELETE ON companies BEGIN
-                INSERT INTO companies_fts(companies_fts, rowid, company_name, industry, company_city, company_description)
-                VALUES ('delete', old.id, old.company_name, old.industry, old.company_city, old.company_description);
+                INSERT INTO companies_fts(companies_fts, rowid, company_name, industry, company_city, company_state, company_description)
+                VALUES ('delete', old.id, old.company_name, old.industry, old.company_city, old.company_state, old.company_description);
             END
-        """)
+            """
+        )
 
         with csv_path.open(newline="", encoding="utf-8") as fh:
             reader = csv.DictReader(fh)
@@ -64,10 +74,10 @@ def build_knowledge_base(csv_path: Path, db_path: Path) -> None:
             INSERT INTO companies (
                 company_name, company_website, company_linkedin,
                 company_number_of_employees, company_description,
-                industry, company_city, company_logo_url
+                industry, company_city, company_state, company_logo_url
             ) VALUES (:company_name, :company_website, :company_linkedin,
                       :company_number_of_employees, :company_description,
-                      :industry, :company_city, :company_logo_url)
+                      :industry, :company_city, :company_state, :company_logo_url)
             """,
             rows,
         )
