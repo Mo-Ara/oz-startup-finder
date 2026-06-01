@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+import traceback
 
 REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 if REPO_ROOT not in sys.path:
@@ -32,18 +33,14 @@ def lead_card(lead: dict) -> str:
     website = lead.get("company_website") or ""
     logo = lead.get("company_logo_url") or ""
     confidence = _fmt_pct(lead.get("confidence"))
-    relevance = ""
     if not confidence:
         try:
-            raw_conf = lead.get("confidence_score")
-            if raw_conf is not None:
-                confidence = _fmt_pct(raw_conf)
+            confidence = _fmt_pct(lead.get("confidence_score"))
         except (TypeError, ValueError):
             confidence = ""
 
     logo_html = f"<img src='{logo}' alt='logo' class='lead-logo'/>" if logo else ""
     confidence_html = f"<span class='badge badge-conf'>{confidence}</span>" if confidence else ""
-    relevance_html = f"<span class='badge badge-rel'>{relevance}</span>" if relevance else ""
     location_html = f"<span class='meta'>{location}</span>" if location else ""
     industry_html = f"<span class='meta'>{industry}</span>" if industry else ""
     website_html = f"<a href='{website}' target='_blank'>website</a>" if website else ""
@@ -58,7 +55,7 @@ def lead_card(lead: dict) -> str:
         {logo_html}
       </div>
       <div class='lead-body'>
-        <div class='lead-trace'>{relevance_html} {confidence_html}</div>
+        <div class='lead-trace'>{confidence_html}</div>
         <div class='lead-link'>{website_html}</div>
       </div>
     </div>
@@ -90,8 +87,13 @@ async def run_workflow(query: str):
     if not query or not query.strip():
         return "", build_leads_html([]), ""
 
-    pipeline = OzStartupFinderPipeline()
-    state = await pipeline.run(query)
+    try:
+        pipeline = OzStartupFinderPipeline()
+        state = await pipeline.run(query)
+    except Exception as exc:
+        tb = traceback.format_exc()
+        print("WORKFLOW_ERROR:", tb)
+        return f"Workflow failed: {exc}", build_leads_html([]), f"```\n{tb}\n```"
 
     trace_md = build_trace_md(state) if state else ""
     synthesis = state.synthesis if state else None
@@ -114,7 +116,6 @@ CSS = """
 .meta { background: #f3f4f6; color: #374151; padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 500; }
 .badge { padding: 4px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
 .badge-conf { background: #eef2ff; color: #1d4ed8; }
-.badge-rel { background: #f5f3ff; color: #7c3aed; }
 .lead-link a { color: #2563eb; text-decoration: none; font-weight: 500; font-size: 13px; }
 .lead-link a:hover { text-decoration: underline; }
 .empty-state { color: #6b7280; font-size: 14px; padding: 18px 0; }
