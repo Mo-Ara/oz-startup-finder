@@ -26,6 +26,7 @@ def format_results(state: PipelineState) -> str:
     leads_md = ["## Summary", summary or "_Waiting for pipeline output._"]
 
     for lead in state.synthesis.get("leads_json", [])[:20]:
+        location = ", ".join(filter(None, [lead.get("company_city"), lead.get("company_state")]))
         leads_md.append(
             "- "
             + ", ".join(
@@ -34,7 +35,7 @@ def format_results(state: PipelineState) -> str:
                     [
                         f"**{lead.get('company_name')}**",
                         lead.get("industry"),
-                        lead.get("company_city"),
+                        location or None,
                         f"relevance {lead.get('relevance_score')}",
                         f"confidence {lead.get('confidence_score')}",
                     ],
