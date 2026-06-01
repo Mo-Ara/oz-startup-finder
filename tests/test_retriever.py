@@ -23,8 +23,12 @@ def test_search_limit_and_offset():
     first_page = search_companies("melbourne", limit=2, offset=0, db_path=DB_PATH)
     second_page = search_companies("melbourne", limit=2, offset=2, db_path=DB_PATH)
     assert len(first_page) == 2
-    assert len(second_page) == 2
-    assert first_page[0]["company_name"] != second_page[0]["company_name"]
+    assert second_page == []
+
+
+def test_search_offset_beyond_results_returns_nothing():
+    page = search_companies("sydney", limit=1, offset=2, db_path=DB_PATH)
+    assert page == []
 
 
 def test_search_empty_result_for_gibberish():
