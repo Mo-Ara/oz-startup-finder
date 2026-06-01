@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from google.adk.agents import LlmAgent
 
-from shared.llm_factory import get_llm
+from shared.llm_factory import get_model_name
 from shared.prompts.enricher import ENRICHER_SYSTEM_PROMPT
 
 
 def build_enricher_agent(model: str | None = None) -> LlmAgent:
     return LlmAgent(
         name="enricher",
-        model=model or get_llm(),
+        model=model or get_model_name(),
         instruction=ENRICHER_SYSTEM_PROMPT,
         description=(
             "Per-lead enrichment agent. Generates concise relevance narratives for a batch "

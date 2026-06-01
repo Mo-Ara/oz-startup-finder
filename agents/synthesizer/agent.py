@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from google.adk.agents import LlmAgent
 
-from shared.llm_factory import get_llm
+from shared.llm_factory import get_model_name
 from shared.prompts.synthesizer import SYNTHESIZER_SYSTEM_PROMPT
 
 
 def build_synthesizer_agent(model: str | None = None) -> LlmAgent:
     return LlmAgent(
         name="synthesizer",
-        model=model or get_llm(),
+        model=model or get_model_name(),
         instruction=SYNTHESIZER_SYSTEM_PROMPT,
         description=(
             "Final output formatter. Accepts scored leads and produces a clean, human-readable "

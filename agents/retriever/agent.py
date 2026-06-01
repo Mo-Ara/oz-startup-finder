@@ -1,12 +1,12 @@
 from google.adk.agents import LlmAgent
 
-from shared.llm_factory import get_llm
+from shared.llm_factory import get_model_name
 
 
 def build_retriever_agent(model: str | None = None) -> LlmAgent:
     return LlmAgent(
         name="retriever",
-        model=model or get_llm(),
+        model=model or get_model_name(),
         instruction=(
             "You are a retrieval specialist. Given a query and optional search strategy, "
             "use the db_search tool to return the most relevant startup candidates from the "

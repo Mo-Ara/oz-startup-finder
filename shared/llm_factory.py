@@ -32,3 +32,7 @@ def get_client() -> AsyncOpenAI:
 
 
 get_llm = get_client
+
+
+def get_model_name() -> str:
+    return LLMConfig().model
