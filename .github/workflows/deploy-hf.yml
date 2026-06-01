@@ -25,5 +25,6 @@ jobs:
       - name: Upload Space assets
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE_REPO_ID: ${{ secrets.HF_SPACE_REPO_ID }}
         run: |
           huggingface-cli upload "$HF_SPACE_REPO_ID" Dockerfile README.md ui requirements.txt deploy/ui/app.py . --repo-type space
