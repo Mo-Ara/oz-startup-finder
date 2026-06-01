@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Sequence
+from collections.abc import Sequence
 
 import gradio as gr
 
@@ -18,21 +18,58 @@ def build_workflow_steps(state: PipelineState) -> Sequence[str]:
     ]
 
 
-async def run_workflow(query: str) -> tuple[str, str]:
+def format_results(state: PipelineState) -> str:
+    if not state.synthesis:
+        return "No synthesized results yet."
+
+    summary = state.synthesis.get("summary", "")
+    leads_md = ["## Summary", summary or "_Waiting for pipeline output._"]
+
+    for lead in state.synthesis.get("leads_json", [])[:20]:
+        leads_md.append(
+            "- "
+            + ", ".join(
+                filter(
+                    None,
+                    [
+                        f"**{lead.get('company_name')}**",
+                        lead.get("industry"),
+                        lead.get("company_city"),
+                        f"relevance {lead.get('relevance_score')}",
+                        f"confidence {lead.get('confidence_score')}",
+                    ],
+                )
+            )
+        )
+        url = lead.get("company_website")
+        if url:
+            leads_md.append(f"  - [website]({url})")
+
+    return "\n".join(leads_md)
+
+
+async def run_workflow(query: str) -> tuple[str, str, str]:
     pipeline = OzStartupFinderPipeline()
     state = await pipeline.run(query)
-    steps = build_workflow_steps(state)
-    step_text = "\n".join(steps)
-    summary = state.synthesis.get("summary", "")
-    return step_text, summary
+    trace_text = "\n".join(build_workflow_steps(state))
+    results_md = format_results(state)
+    csv_markdown = "No export available."
+    return trace_text, results_md, csv_markdown
 
 
-with gr.Blocks(title="oz-startup-finder") as app:
-    trace = gr.Textbox(label="Agent workflow", lines=6)
-    chat = gr.Textbox(label="Research request", placeholder="AI-powered code review...")
-    response = gr.Markdown(label="Results")
-    chat.submit(run_workflow, [chat], [trace, response])
+def export_csv(state: PipelineState) -> str:
+    from shared.tools.csv_export import leads_to_csv
+
+    leads = state.synthesis.get("leads_json", [])
+    if not leads:
+        return "No results to export."
+
+    try:
+        return leads_to_csv(leads)
+    except Exception as exc:  # pragma: no cover
+        return f"Export failed: {exc}"
 
 
-if __name__ == "__main__":
-    app.launch()
+async def handle_export(state: PipelineState) -> tuple[str, str]:
+    csv_text = export_csv(state)
+    return csv_text, "CSV export ready." if csv_text and "failed" not in csv_text.lower() else csv_text
