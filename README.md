@@ -1,3 +1,14 @@
+---
+title: oz-startup-finder
+emoji: 🔍
+colorFrom: blue
+colorTo: purple
+sdk: gradio
+sdk_version: 5.x
+app_file: app.py
+pinned: false
+---
+
 # oz-startup-finder
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
