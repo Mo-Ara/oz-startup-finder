@@ -1,6 +1,7 @@
 from google.adk.agents import LlmAgent
 
 from shared.llm_factory import get_model_name
+from shared.tools.db_search import db_search
 
 
 def build_retriever_agent(model: str | None = None) -> LlmAgent:
@@ -14,5 +15,5 @@ def build_retriever_agent(model: str | None = None) -> LlmAgent:
             "industry, company_city, and any other allowed fields. Maximum of 10 results.\n\n"
             "Output JSON: { top_matches: [{company_name, industry, company_city, match_score, rationale}] }"
         ),
-        tools=["shared.tools.db_search:db_search"],
+        tools=[db_search],
     )
