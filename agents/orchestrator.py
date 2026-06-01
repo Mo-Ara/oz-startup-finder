@@ -44,7 +44,11 @@ class OzStartupFinderPipeline:
             session_service=InMemorySessionService(),
             app_name="oz-startup-finder",
         )
-        await clarifying_session.run()
+        await clarifying_session.run(
+            user_id="local-user",
+            session_id=f"{self.session_id}:clarifying",
+            new_message=user_query,
+        )
         self._assign(
             "clarifying_questions",
             getattr(clarifying_session, "follow_up_questions", []),
