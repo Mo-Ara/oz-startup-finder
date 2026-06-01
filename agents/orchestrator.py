@@ -26,7 +26,6 @@ class PipelineState:
 class OzStartupFinderPipeline:
     def __init__(self, session_id: str | None = None, model: str | None = None) -> None:
         self.model = model
-        self.session_service = InMemorySessionService()
         self.session_id = session_id or "oz-startup-finder"
         self.state = PipelineState()
 
@@ -39,10 +38,10 @@ class OzStartupFinderPipeline:
 
     async def run(self, user_query: str) -> PipelineState:
         self.state.user_query = user_query
+
         clarifying_session = Runner(
             agent=self.clarifying_agent,
-            session_service=self.session_service,
-            session_id=f"{self.session_id}:clarifying",
+            session_service=InMemorySessionService(),
         )
         clarifying_out = await clarifying_session.run(user_query)
         self._assign("clarifying_questions", getattr(clarifying_out, "follow_up_questions", []))
@@ -51,16 +50,14 @@ class OzStartupFinderPipeline:
 
         router_session = Runner(
             agent=self.router_agent,
-            session_service=self.session_service,
-            session_id=f"{self.session_id}:router",
+            session_service=InMemorySessionService(),
         )
         router_out = await router_session.run(user_query)
         self._assign("router_output", getattr(router_out, "structured_output", {}))
 
         retriever_session = Runner(
             agent=self.retriever_agent,
-            session_service=self.session_service,
-            session_id=f"{self.session_id}:retriever",
+            session_service=InMemorySessionService(),
         )
         retrieval_out = await retriever_session.run(user_query)
         self._assign("retrieved_candidates", getattr(retrieval_out, "top_matches", []))
@@ -69,8 +66,7 @@ class OzStartupFinderPipeline:
         for candidate in self.state.retrieved_candidates[:10]:
             enriched_session = Runner(
                 agent=self.enricher_agent,
-                session_service=self.session_service,
-                session_id=f"{self.session_id}:enricher:{candidate.get('company_name', 'unknown')}",
+                session_service=InMemorySessionService(),
             )
             enriched_out = await enriched_session.run(user_query)
             payload = getattr(enriched_out, "structured_output", {})
@@ -79,19 +75,15 @@ class OzStartupFinderPipeline:
         self._assign("enriched_leads", enriched)
 
         scorer_session = Runner(
-            agent_name=self.scorer_agent.name,
             agent=self.scorer_agent,
-            session_service=self.session_service,
-            session_id=f"{self.session_id}:scorer",
+            session_service=InMemorySessionService(),
         )
         scorer_out = await scorer_session.run(user_query)
         self._assign("scored_leads", getattr(scorer_out, "scored_leads", []))
 
         synthesizer_session = Runner(
-            agent_name=self.synthesizer_agent.name,
             agent=self.synthesizer_agent,
-            session_service=self.session_service,
-            session_id=f"{self.session_id}:synthesizer",
+            session_service=InMemorySessionService(),
         )
         synthesizer_out = await synthesizer_session.run(user_query)
         self._assign("synthesis", getattr(synthesizer_out, "structured_output", {}))
