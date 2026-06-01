@@ -42,6 +42,7 @@ class OzStartupFinderPipeline:
         clarifying_session = Runner(
             agent=self.clarifying_agent,
             session_service=InMemorySessionService(),
+            app_name="oz-startup-finder",
         )
         clarifying_out = await clarifying_session.run(user_query)
         self._assign("clarifying_questions", getattr(clarifying_out, "follow_up_questions", []))
@@ -51,6 +52,7 @@ class OzStartupFinderPipeline:
         router_session = Runner(
             agent=self.router_agent,
             session_service=InMemorySessionService(),
+            app_name="oz-startup-finder",
         )
         router_out = await router_session.run(user_query)
         self._assign("router_output", getattr(router_out, "structured_output", {}))
@@ -58,6 +60,7 @@ class OzStartupFinderPipeline:
         retriever_session = Runner(
             agent=self.retriever_agent,
             session_service=InMemorySessionService(),
+            app_name="oz-startup-finder",
         )
         retrieval_out = await retriever_session.run(user_query)
         self._assign("retrieved_candidates", getattr(retrieval_out, "top_matches", []))
@@ -67,6 +70,7 @@ class OzStartupFinderPipeline:
             enriched_session = Runner(
                 agent=self.enricher_agent,
                 session_service=InMemorySessionService(),
+                app_name="oz-startup-finder",
             )
             enriched_out = await enriched_session.run(user_query)
             payload = getattr(enriched_out, "structured_output", {})
@@ -77,6 +81,7 @@ class OzStartupFinderPipeline:
         scorer_session = Runner(
             agent=self.scorer_agent,
             session_service=InMemorySessionService(),
+            app_name="oz-startup-finder",
         )
         scorer_out = await scorer_session.run(user_query)
         self._assign("scored_leads", getattr(scorer_out, "scored_leads", []))
@@ -84,6 +89,7 @@ class OzStartupFinderPipeline:
         synthesizer_session = Runner(
             agent=self.synthesizer_agent,
             session_service=InMemorySessionService(),
+            app_name="oz-startup-finder",
         )
         synthesizer_out = await synthesizer_session.run(user_query)
         self._assign("synthesis", getattr(synthesizer_out, "structured_output", {}))
