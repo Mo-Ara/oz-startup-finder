@@ -1,12 +1,17 @@
 # Deploy Notes
 
-## HuggingFace Spaces
+## HuggingFace Spaces (Gradio)
 
-1. Create a new Space using the "Docker" template.
-2. Push this repo to the Space or connect a GitHub repository.
-3. Set `OPENROUTER_API_KEY` in the Space secrets.
-4. Place `data/startups.db` in the Space root or mount it as a volume.
-5. The app starts on port 7860 via `python ui/app.py`.
+1. Open the existing Space: `https://huggingface.co/spaces/Mo-Ara/oz-startup-finder`
+2. In the Space **Settings**:
+   - Add a secret named `OPENROUTER_API_KEY`.
+3. In the Space **Files** tab:
+   - Upload `data/startups.db`.
+4. In the GitHub repo **Settings → Secrets and variables → Actions**, add:
+   - `HF_TOKEN`
+   - `HF_SPACE_REPO_ID` (`Mo-Ara/oz-startup-finder`)
+5. Push to `master` or trigger the `deploy-hf.yml` workflow.
+6. Verify the Space reloads with `app.py` and the Gradio UI appears.
 
 ## Cloud Run
 
