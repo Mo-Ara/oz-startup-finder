@@ -27,11 +27,10 @@ jobs:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_SPACE_REPO_ID: ${{ secrets.HF_SPACE_REPO_ID }}
         run: |
-          hf upload "$HF_SPACE_REPO_ID" \
-            Dockerfile README.md app.py requirements.txt \
-            agents shared ui scripts tests docs shared tools \
+          hf upload "$HF_SPACE_REPO_ID" . . \
             --repo-type space \
-            --ignore "*.db" \
-            --ignore "*.csv" \
-            --ignore ".git/*" \
-            --ignore ".venv/*"
+            --exclude "*.db" \
+            --exclude "*.csv" \
+            --exclude ".git/*" \
+            --exclude ".venv/*" \
+            --exclude "__pycache__/*"
