@@ -9,8 +9,9 @@ DB_PATH = Path("data") / "startups.db"
 
 
 def test_search_returns_expected_result_structure():
-    rows = search_companies("health", limit=5, db_path=DB_PATH)
+    rows = search_companies("melbourne", limit=5, db_path=DB_PATH)
     assert isinstance(rows, list)
+    assert rows, "expected seed-backed rows for 'melbourne'"
     for row in rows:
         assert "company_name" in row
         assert "industry" in row

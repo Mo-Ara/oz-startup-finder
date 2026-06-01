@@ -7,9 +7,10 @@ DB_PATH = Path(__file__).resolve().parent.parent / "data" / "startups.db"
 
 
 def test_db_search_with_valid_query():
-    result = db_search("AI", limit=5, db_path=str(DB_PATH))
-    assert result["query"] == "AI"
+    result = db_search("melbourne", limit=5, db_path=str(DB_PATH))
+    assert result["query"] == "melbourne"
     assert len(result["results"]) <= 5
+    assert result["results"], "expected seed-backed rows for 'melbourne'"
 
 
 def test_db_search_respects_limit():
