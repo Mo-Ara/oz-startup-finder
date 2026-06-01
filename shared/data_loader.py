@@ -35,6 +35,7 @@ def search_companies(
                 company_number_of_employees,
                 industry,
                 company_city,
+                company_state,
                 company_logo_url,
                 bm25(companies_fts) AS rank
             FROM companies
