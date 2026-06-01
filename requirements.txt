@@ -1,0 +1,18 @@
+# Agent framework
+google-adk>=0.2.0
+
+# UI
+gradio>=5.0
+
+# LLM client
+openai>=1.0
+requests>=2.32
+
+# Data
+sqlite-utils>=3.37
+beautifulsoup4>=4.12
+
+# Dev / CI
+pytest>=8.0
+pytest-asyncio>=0.23
+ruff>=0.6
