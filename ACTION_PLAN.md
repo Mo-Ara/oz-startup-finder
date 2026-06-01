@@ -141,6 +141,8 @@ Only after Phases 0–6 are stable.
 - **PR for every phase:** do not merge directly to main.
 - **No data in git:** `data/*.db` and `data/*.csv` are permanently gitignored.
 - **No raw descriptions in output:** enforced by prompt + output schema; test for this.
+- **Webhook verification errors:** when using `pnpm run ...`, ensure the GitHub webhook/verification CLI/command is run before proceed to next step. This avoids inconsistent secret/hook state.
+- **Deploy note:** once the module is working, push the updated code; if HF Space needs a manual refresh, trigger a rebuild in Space Settings after the push.
 
 ---
 
