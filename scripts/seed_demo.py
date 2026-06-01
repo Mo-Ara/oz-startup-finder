@@ -17,6 +17,7 @@ SEED_DATA = [
         "company_description": "Acme AI builds autonomous code review agents for enterprise engineering teams.",
         "industry": "Developer Tools",
         "company_city": "Sydney",
+        "company_state": "NSW",
         "company_logo_url": "https://acme-ai.example.com/logo.png",
     },
     {
@@ -27,6 +28,7 @@ SEED_DATA = [
         "company_description": "QuantumLedger provides immutable audit trails for regulated industries using distributed ledger technology.",
         "industry": "Fintech",
         "company_city": "Melbourne",
+        "company_state": "VIC",
         "company_logo_url": "https://quantumledger.example.com/logo.png",
     },
     {
@@ -37,6 +39,7 @@ SEED_DATA = [
         "company_description": "GreenGrid optimises energy consumption for commercial buildings using IoT sensors and forecasting models.",
         "industry": "CleanTech",
         "company_city": "Brisbane",
+        "company_state": "QLD",
         "company_logo_url": "https://greengrid.example.com/logo.png",
     },
     {
@@ -47,6 +50,7 @@ SEED_DATA = [
         "company_description": "MediScan uses computer vision to detect early signs of diabetic retinopathy from retinal scans.",
         "industry": "HealthTech",
         "company_city": "Sydney",
+        "company_state": "NSW",
         "company_logo_url": "https://mediscan.example.com/logo.png",
     },
     {
@@ -57,6 +61,7 @@ SEED_DATA = [
         "company_description": "Shipwise streamlines last-mile logistics for e-commerce businesses.",
         "industry": "Logistics",
         "company_city": "Melbourne",
+        "company_state": "VIC",
         "company_logo_url": "https://shipwise.example.com/logo.png",
     },
 ]
