@@ -3,22 +3,45 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-DB_PATH = Path("data/startups.db")
+from shared.data_loader import search_companies, get_company_by_name
+
+DB_PATH = Path("data") / "startups.db"
 
 
-def test_fts5_search_returns_rows() -> None:
-    conn = sqlite3.connect(DB_PATH)
+def test_search_returns_expected_result_structure():
+    rows = search_companies("health", limit=5, db_path=DB_PATH)
+    assert isinstance(rows, list)
+    for row in rows:
+        assert "company_name" in row
+        assert "industry" in row
+        assert "company_city" in row
+        assert "company_website" in row
+        assert "rank" in row
+
+
+def test_search_limit_and_offset():
+    first_page = search_companies("a", limit=2, offset=0, db_path=DB_PATH)
+    second_page = search_companies("a", limit=2, offset=2, db_path=DB_PATH)
+    assert len(first_page) == 2
+    assert len(second_page) == 2
+    assert first_page[0]["company_name"] != second_page[0]["company_name"]
+
+
+def test_search_empty_result_for_gibberish():
+    rows = search_companies("xyznonexistent12345", db_path=DB_PATH)
+    assert rows == []
+
+
+def test_get_company_by_name_returns_expected_row():
+    row = get_company_by_name("MediScan", db_path=DB_PATH)
+    assert row is not None
+    assert row["industry"] == "HealthTech"
+    assert row["company_city"] == "Sydney"
+
+
+def test_database_contains_seed_companies():
+    conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
-    rows = conn.execute(
-        "SELECT company_name, industry FROM companies WHERE company_name MATCH 'Acme'"
-    ).fetchall()
+    count = conn.execute("SELECT COUNT(*) AS c FROM companies").fetchone()["c"]
     conn.close()
-
-    assert len(rows) >= 1
-    assert rows[0]["company_name"] == "Acme AI"
-
-
-def test_company_count() -> None:
-    from tests.conftest import db_conn
-
-    assert db_conn is not None  # placeholder for future test expansion
+    assert count >= 5  # seed_demo.py inserts 5 synthetic companies
