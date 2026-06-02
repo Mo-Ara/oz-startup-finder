@@ -11,7 +11,7 @@ if REPO_ROOT not in sys.path:
 
 import gradio as gr  # noqa: E402
 
-from agents.orchestrator import OzStartupFinderPipeline  # noqa: E402
+from agents.orchestrator import OzStartupFinderPipeline, PipelineState  # noqa: E402
 
 
 def _maybe_json(obj: Any) -> str:
@@ -24,6 +24,10 @@ def _maybe_json(obj: Any) -> str:
 
 
 CSS = """
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
 .leads-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 10px; }
 .lead-card { border: 1px solid #e5e7eb; border-radius: 14px; padding: 14px; background: #ffffff; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
 .lead-header { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
@@ -39,6 +43,9 @@ CSS = """
 .lead-link a:hover { text-decoration: underline; }
 .empty-state { color: #6b7280; font-size: 14px; padding: 18px 0; }
 .logs { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; white-space: pre-wrap; background:#0b1220; color:#e6edf3; padding:14px; border-radius:12px; max-height:280px; overflow:auto; }
+.step-running { animation: pulse 1.5s infinite; color: #2563eb; }
+.step-done { color: #059669; }
+.step-pending { color: #9ca3af; }
 """
 
 
@@ -63,7 +70,7 @@ def _lead_card(lead: dict) -> str:
     return f"""
     <div class='lead-card'>
       <div class='lead-header'>
-        <div class='lead-title-group'>
+        <div class='title-group'>
           <div class='lead-name'>{name}</div>
           <div class='lead-meta-row'>{industry_html} {location_html}</div>
         </div>
@@ -75,6 +82,88 @@ def _lead_card(lead: dict) -> str:
       </div>
     </div>
     """
+
+
+def _step_detail(state: PipelineState | None, idx: int) -> str:
+    if state is None:
+        return ""
+    if idx == 0:
+        n = len(state.clarifying_questions or [])
+        return f"<small>{n} question(s)</small>" if n else ""
+    if idx == 1:
+        strategy = (state.router_output or {}).get("strategy")
+        return f"<small>strategy: {strategy}</small>" if strategy else ""
+    if idx == 2:
+        return f"<small>retrieved: {len(state.retrieved_candidates or [])}</small>"
+    if idx == 3:
+        return f"<small>enriched: {len(state.enriched_leads or [])}</small>"
+    if idx == 4:
+        return f"<small>scored: {len(state.scored_leads or [])}</small>"
+    if idx == 5:
+        summary = (state.synthesis or {}).get("summary")
+        return f"<small>{summary}</small>" if summary else ""
+    return ""
+
+
+def _render_trace(state: PipelineState | None, completed_count: int) -> str:
+    steps = [
+        ("1. Clarify", "Identifying follow-up questions..."),
+        ("2. Router", "Analyzing query intent..."),
+        ("3. Retrieval", "Searching for matching startups..."),
+        ("4. Enrichment", "Gathering company details..."),
+        ("5. Scoring", "Ranking leads by relevance..."),
+        ("6. Synthesis", "Compiling final results..."),
+    ]
+
+    lines = []
+    for i in range(6):
+        if i < completed_count:
+            status = "✅"
+            css_class = "step-done"
+            detail = _step_detail(state, i)
+        elif i == completed_count:
+            status = "🔄"
+            css_class = "step-running"
+            detail = f"<small>{steps[i][1]}</small>"
+        else:
+            status = "⏳"
+            css_class = "step-pending"
+            detail = ""
+
+        title = steps[i][0]
+        if detail:
+            lines.append(f"<div class='{css_class}'><b>{title}</b> {status} {detail}</div>")
+        else:
+            lines.append(f"<div class='{css_class}'><b>{title}</b> {status}</div>")
+
+    return "<br>".join(lines)
+
+
+def _render_results(state: PipelineState | None, done: bool = False) -> str:
+    if state is None:
+        return "<div class='empty-state'>Initializing...</div>"
+
+    synthesis = state.synthesis or {}
+    leads = synthesis.get("leads_json") or []
+
+    if not leads:
+        leads = (
+            state.enriched_leads
+            or state.scored_leads
+            or state.retrieved_candidates
+            or []
+        )
+
+    if leads:
+        cards = "".join(_lead_card(lead) for lead in leads[:20])
+        return f"<div class='leads-grid'>{cards}</div>"
+
+    if done:
+        if synthesis.get("summary"):
+            return f"<div class='empty-state'>{synthesis.get('summary')}</div>"
+        return "<div class='empty-state'>No leads found.</div>"
+
+    return "<div class='empty-state'>Searching...</div>"
 
 
 with gr.Blocks(title="oz-startup-finder") as demo:
@@ -89,7 +178,7 @@ with gr.Blocks(title="oz-startup-finder") as demo:
         show_label=False,
     )
     run = gr.Button("Run workflow", variant="primary", scale=2)
-    trace = gr.Markdown("")
+    trace = gr.HTML("")
     results_html = gr.HTML(label="Results")
     summary_md = gr.Markdown(label="Summary")
     logs = gr.HTML(value="<div class='logs'>No logs yet.</div>")
@@ -101,61 +190,48 @@ with gr.Blocks(title="oz-startup-finder") as demo:
             return
 
         logs_out = "<div class='logs'>Starting workflow...</div>"
-        yield "Running: clarifying...", "<div class='empty-state'>Processing...</div>", "", logs_out
+        yield _render_trace(None, 0), "<div class='empty-state'>Searching...</div>", "", logs_out
 
         try:
             pipeline = OzStartupFinderPipeline()
         except Exception as exc:
             logs_out = f"<div class='logs'>INIT_ERROR: {exc}</div>"
-            yield f"Init failed: {exc}", "<div class='empty-state'>Init failed</div>", "", logs_out
+            yield f"Init failed: {exc}", f"<div class='empty-state'>Init failed</div>", "", logs_out
             return
 
         state = None
+        stage_index = 0
         try:
             async for state in pipeline.run(q):
-                router_output = state.router_output or {}
-                trace_out = "\n".join([
-                    f"### 2. Router\n```\n{_maybe_json(router_output)}\n```",
-                    f"### 3. Retrieval\n```\nretrieved: {len(state.retrieved_candidates or [])}\n```",
-                    f"### 4. Enrichment\n```\nenriched: {len(state.enriched_leads or [])}\n```",
-                    f"### 5. Scoring\n```\nscored: {len(state.scored_leads or [])}\n```",
-                    f"### 6. Synthesis\n```\n{_maybe_json(state.synthesis or {})}\n```",
-                ])
-                synthesis = state.synthesis or {}
-                summary_out = synthesis.get("summary") or ""
-                leads = synthesis.get("leads_json") or state.enriched_leads or state.scored_leads or []
-                cards = "".join(_lead_card(lead) for lead in leads[:20])
-                results_out = f"<div class='leads-grid'>{cards}</div>" if cards else "<div class='empty-state'>No leads found.</div>"
-                logs_out = "<div class='logs'>Run complete.</div>"
-                yield trace_out, results_out, summary_out, logs_out
+                logs_out = f"<div class='logs'>[Stage {stage_index + 1}/6] Running...</div>"
+                trace_html = _render_trace(state, stage_index)
+                results_html_value = _render_results(state, done=False)
+                yield trace_html, results_html_value, "", logs_out
+                logs_out = f"<div class='logs'>[Stage {stage_index + 1}/6] Complete.</div>"
+                stage_index += 1
         except Exception as exc:
-            logs_out = f"<div class='logs'>WORKFLOW_ERROR:\n{traceback.format_exc()}</div>"
-            yield f"Workflow failed: {exc}", "<div class='empty-state'>Workflow failed</div>", "", logs_out
+            logs_out = f"<div class='logs'>WORKFLOW_ERROR:\\n{traceback.format_exc()}</div>"
+            yield f"Workflow failed: {exc}", f"<div class='empty-state'>Workflow failed</div>", "", logs_out
             return
 
-        trace_out = ""
-        results_out = "<div class='empty-state'>No leads found.</div>"
+        trace_html = _render_trace(state or PipelineState(), min(stage_index, 6))
         summary_out = ""
+        leads: list[dict] = []
+        if state:
+            summary_out = (state.synthesis or {}).get("summary") or ""
+            leads = (
+                (state.synthesis or {}).get("leads_json")
+                or state.enriched_leads
+                or state.scored_leads
+                or state.retrieved_candidates
+                or []
+            )
+        cards = "".join(_lead_card(lead) for lead in leads[:20])
+        results_html_value = (
+            f"<div class='leads-grid'>{cards}</div>" if cards else "<div class='empty-state'>No leads found.</div>"
+        )
         logs_out = "<div class='logs'>Run complete.</div>"
-
-        if state is not None:
-            router_output = state.router_output or {}
-            trace_out = "\n".join([
-                f"### 2. Router\n```\n{_maybe_json(router_output)}\n```",
-                f"### 3. Retrieval\n```\nretrieved: {len(state.retrieved_candidates or [])}\n```",
-                f"### 4. Enrichment\n```\nenriched: {len(state.enriched_leads or [])}\n```",
-                f"### 5. Scoring\n```\nscored: {len(state.scored_leads or [])}\n```",
-                f"### 6. Synthesis\n```\n{_maybe_json(state.synthesis or {})}\n```",
-            ])
-            synthesis = state.synthesis or {}
-            summary_out = synthesis.get("summary") or ""
-            leads = synthesis.get("leads_json") or []
-            if not leads:
-                leads = state.enriched_leads or state.scored_leads or []
-            cards = "".join(_lead_card(lead) for lead in leads[:20])
-            results_out = f"<div class='leads-grid'>{cards}</div>" if cards else "<div class='empty-state'>No leads found.</div>"
-
-        yield trace_out, results_out, summary_out, logs_out
+        yield trace_html, results_html_value, summary_out, logs_out
 
     run.click(
         fn=run_workflow,
