@@ -47,9 +47,14 @@ try:
     from google.adk.runners import InvocationContext
     from agents.orchestrator import OzStartupFinderPipeline
     _IMPORT_OK = True
-    _IMPORT_ERROR = None
-except Exception as _IMPORT_ERROR:  # pragma: no cover - diagnostic only
+except Exception as exc:
     _IMPORT_OK = False
+    print(
+        "APP_STARTUP_ERROR: failed to import application code.\n",
+        "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)),
+        flush=True,
+    )
+    traceback.print_exc()
 
 import gradio as gr  # noqa: E402
 
