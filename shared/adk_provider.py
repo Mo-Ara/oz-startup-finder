@@ -56,17 +56,26 @@ class _OpenRouterLlm(BaseLlm):
 
     def _msgs(self, llm_request: LlmRequest) -> List[Dict[str, str]]:
         messages: List[Dict[str, str]] = []
-        contents: List[types.Content] = []
-        if llm_request.system_instruction and llm_request.system_instruction.parts:
-            contents.append(llm_request.system_instruction)
-        contents.extend(getattr(llm_request, "messages", []) or [])
 
+        # ADK 1.10.0 stores system instruction as a plain string
+        # in GenerateContentConfig, not as a separate Content object.
+        system_text = ""
+        try:
+            cfg = llm_request.config or types.GenerateContentConfig()
+            system_text = (cfg.system_instruction or "").strip()
+        except Exception:
+            system_text = ""
+        if system_text:
+            messages.append({"role": "system", "content": system_text})
+
+        contents: List[types.Content] = getattr(llm_request, "contents", []) or []
         for content in contents:
             if not isinstance(content, types.Content):
                 continue
             role = "user" if content.role in {"user", "model"} else content.role
             text = ", ".join(part.text for part in (content.parts or []) if part.text)
-            messages.append({"role": role, "content": text})
+            if text:
+                messages.append({"role": role, "content": text})
         return messages
 
     def generate_content_async(
