@@ -123,6 +123,12 @@ class _OpenRouterLlm(BaseLlm):
                     messages=messages,
                 )
             except Exception as exc:
+                status = getattr(exc, "status_code", None) or getattr(getattr(exc, "response", None), "status_code", None)
+                if status == 400:
+                    raise RuntimeError(
+                        f"OpenRouter rejected the model '{model}'. "
+                        f"Set OPENROUTER_MODEL in .env to a valid model ID like 'openrouter/free'."
+                    ) from exc
                 raise RuntimeError(f"OpenRouter request failed: {exc}") from exc
             text = response.choices[0].message.content or ""
             yield LlmResponse(
