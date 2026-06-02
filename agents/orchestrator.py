@@ -39,12 +39,14 @@ class OzStartupFinderPipeline:
 
     async def run(self, user_query: str) -> PipelineState:
         self.state.user_query = user_query
+
         clarifying_session = Runner(
             agent=self.clarifying_agent,
             session_service=self.session_service,
             app_name="oz-startup-finder",
         )
-        clarifying_out = await clarifying_session.run(
+        clarifying_out = _consume(
+            clarifying_session,
             user_id="local-user",
             session_id=f"{self.session_id}:clarifying",
             new_message=user_query,
@@ -58,7 +60,8 @@ class OzStartupFinderPipeline:
             session_service=self.session_service,
             app_name="oz-startup-finder",
         )
-        router_out = await router_session.run(
+        router_out = _consume(
+            router_session,
             user_id="local-user",
             session_id=f"{self.session_id}:router",
             new_message=user_query,
@@ -70,7 +73,8 @@ class OzStartupFinderPipeline:
             session_service=self.session_service,
             app_name="oz-startup-finder",
         )
-        retrieval_out = await retriever_session.run(
+        retrieval_out = _consume(
+            retriever_session,
             user_id="local-user",
             session_id=f"{self.session_id}:retriever",
             new_message=user_query,
@@ -84,7 +88,8 @@ class OzStartupFinderPipeline:
                 session_service=self.session_service,
                 app_name="oz-startup-finder",
             )
-            enriched_out = await enriched_session.run(
+            enriched_out = _consume(
+                enriched_session,
                 user_id="local-user",
                 session_id=f"{self.session_id}:enricher:{candidate.get('company_name', 'unknown')}",
                 new_message=user_query,
@@ -98,9 +103,9 @@ class OzStartupFinderPipeline:
             agent=self.scorer_agent,
             session_service=self.session_service,
             app_name="oz-startup-finder",
-            session_id=f"{self.session_id}:scorer",
         )
-        scorer_out = await scorer_session.run(
+        scorer_out = _consume(
+            scorer_session,
             user_id="local-user",
             session_id=f"{self.session_id}:scorer",
             new_message=user_query,
@@ -111,9 +116,9 @@ class OzStartupFinderPipeline:
             agent=self.synthesizer_agent,
             session_service=self.session_service,
             app_name="oz-startup-finder",
-            session_id=f"{self.session_id}:synthesizer",
         )
-        synthesizer_out = await synthesizer_session.run(
+        synthesizer_out = _consume(
+            synthesizer_session,
             user_id="local-user",
             session_id=f"{self.session_id}:synthesizer",
             new_message=user_query,
@@ -127,3 +132,14 @@ class OzStartupFinderPipeline:
 
     def _assign(self, field_name: str, value: object) -> None:
         object.__setattr__(self.state, field_name, value)
+
+
+def _consume(runner: Runner, *, user_id: str, session_id: str, new_message: str):
+    latest = None
+    for event in runner.run(
+        user_id=user_id,
+        session_id=session_id,
+        new_message=new_message,
+    ):
+        latest = event
+    return latest
