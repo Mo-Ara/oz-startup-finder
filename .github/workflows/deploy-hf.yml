@@ -27,10 +27,14 @@ jobs:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_SPACE_REPO_ID: ${{ secrets.HF_SPACE_REPO_ID }}
         run: |
-          hf upload "$HF_SPACE_REPO_ID" . . \
-            --repo-type space \
-            --exclude "*.db" \
-            --exclude "*.csv" \
-            --exclude ".git/*" \
-            --exclude ".venv/*" \
-            --exclude "__pycache__/*"
+          for i in 1 2 3; do
+            hf upload "$HF_SPACE_REPO_ID" . . \
+              --repo-type space \
+              --exclude "*.db" \
+              --exclude "*.csv" \
+              --exclude ".git/*" \
+              --exclude ".venv/*" \
+              --exclude "__pycache__/*" && break
+            echo "hf upload failed (attempt $i), retrying in $((i * 10))s..."
+            sleep $((i * 10))
+          done
