@@ -4,7 +4,7 @@ from collections.abc import Sequence
 
 import gradio as gr
 
-from agents.orchestrator import OzStartupFinderPipeline, PipelineState, _json_from_event_text, _text_from_event
+from agents.orchestrator import OzStartupFinderPipeline, PipelineState
 
 
 def build_workflow_steps(state: PipelineState) -> Sequence[str]:
@@ -19,13 +19,60 @@ def build_workflow_steps(state: PipelineState) -> Sequence[str]:
 
 
 def format_results(state: PipelineState) -> str:
-    if not state.synthesis:
-        return "No synthesized results yet."
+    summary = ""
+    markdown_parts = []
+    leads = state.synthesis.get("leads_json", []) if state.synthesis else []
+
+    if not leads:
+        fallback = (
+            state.scored_leads
+            or state.enriched_leads
+            or state.retrieved_candidates
+        )
+        summary = (
+            state.synthesis.get("summary", "")
+            if state.synthesis
+            else "No synthesized results yet."
+        )
+        if fallback:
+            markdown_parts.append("## Summary")
+            markdown_parts.append(summary or "_Waiting for pipeline output._")
+            markdown_parts.append(
+                f"_Showing {len(fallback)} fallback candidate(s) because synthesis did not return leads._"
+            )
+            for lead in fallback[:20]:
+                location = ", ".join(
+                    filter(
+                        None,
+                        [
+                            lead.get("company_city"),
+                            lead.get("company_state"),
+                        ],
+                    )
+                )
+                markdown_parts.append(
+                    "- "
+                    + ", ".join(
+                        filter(
+                            None,
+                            [
+                                f"**{lead.get('company_name', 'Unnamed')}**",
+                                lead.get("industry"),
+                                location or None,
+                            ],
+                        )
+                    )
+                )
+            return "\n".join(markdown_parts)
+
+        markdown_parts.append("## Summary")
+        markdown_parts.append(summary or "_No leads were found in the current dataset._")
+        return "\n".join(markdown_parts)
 
     summary = state.synthesis.get("summary", "")
     leads_md = ["## Summary", summary or "_Waiting for pipeline output._"]
 
-    for lead in state.synthesis.get("leads_json", [])[:20]:
+    for lead in leads[:20]:
         location = ", ".join(
             filter(
                 None,
@@ -59,21 +106,16 @@ def format_results(state: PipelineState) -> str:
 
 async def run_workflow(query: str):
     pipeline = OzStartupFinderPipeline()
-    state = pipeline.state
-    trace_text = "\n".join(build_workflow_steps(state))
-    csv_markdown = "No export available."
-    yield trace_text, "Running pipeline...", csv_markdown
-
-    state = await pipeline.run(query)
-    trace_text = "\n".join(build_workflow_steps(state))
-    results_md = format_results(state)
-    yield trace_text, results_md, csv_markdown
+    async for state in pipeline.run(query):
+        trace_text = "\n".join(build_workflow_steps(state))
+        results_md = format_results(state)
+        yield trace_text, results_md
 
 
 def export_csv(state: PipelineState) -> str:
     from shared.tools.csv_export import leads_to_csv
 
-    leads = state.synthesis.get("leads_json", [])
+    leads = state.synthesis.get("leads_json", []) if state.synthesis else []
     if not leads:
         return "No results to export."
     try:

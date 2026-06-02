@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -125,8 +126,9 @@ class OzStartupFinderPipeline:
         self.scorer_agent = build_scorer_agent(model=self.model)
         self.synthesizer_agent = build_synthesizer_agent(model=self.model)
 
-    async def run(self, user_query: str) -> PipelineState:
+    async def run(self, user_query: str) -> AsyncGenerator[PipelineState, None]:
         self.state = PipelineState(user_query=user_query)
+        yield self.state
         logger.info("Pipeline start query=%s", user_query)
 
         clarifying_event = await _consume(
@@ -142,6 +144,7 @@ class OzStartupFinderPipeline:
         if isinstance(questions, str):
             questions = [questions]
         _assign(self.state, "clarifying_questions", [str(item) for item in questions])
+        yield self.state
 
         router_event = await _consume(
             Runner(agent=self.router_agent, session_service=self.session_service, app_name="oz-startup-finder"),
@@ -194,9 +197,9 @@ class OzStartupFinderPipeline:
         if not self.state.retrieved_candidates:
             logger.info("No retrieval candidates found for query=%s", user_query)
             self._apply_db_search_state(query=user_query, strategy=strategy)
-            retrieved = self.state.retrieved_candidates
-            if not retrieved:
-                return self.state
+            if not self.state.retrieved_candidates:
+                yield self.state
+                return
 
         # Normalize each retrieved candidate so downstream agents always see
         # consistent fields (company_name, industry, company_city, match_score, rationale).
@@ -214,6 +217,7 @@ class OzStartupFinderPipeline:
         if not self.state.retrieved_candidates:
             logger.info("No normalized retrieval candidates for query=%s", user_query)
             self._apply_db_search_state(query=user_query, strategy=strategy)
+        yield self.state
 
         self.state.enriched_leads = []
         for idx, candidate in enumerate(self.state.retrieved_candidates[:10], start=1):
@@ -238,6 +242,7 @@ class OzStartupFinderPipeline:
             payload = enriched_json if isinstance(enriched_json, dict) else {}
             payload.setdefault("company_name", candidate.get("company_name"))
             self.state.enriched_leads.append(payload)
+        yield self.state
 
         scorer_input = json.dumps(
             {
@@ -262,6 +267,7 @@ class OzStartupFinderPipeline:
             if not scored and "score" in scorer_json:
                 scored = self._normalize_scorer_output(scorer_json)
             self.state.scored_leads = scored or self.state.enriched_leads
+        yield self.state
 
         self.state.synthesis = {}
         synthesis_input_payload = None
@@ -294,14 +300,15 @@ class OzStartupFinderPipeline:
             self.state.synthesis = {}
 
         logger.info("Pipeline complete")
-        return self.state
+        yield self.state
+        return
 
     def _apply_db_search_state(self, *, query: str, strategy: str) -> None:
         db_path = Path(__file__).resolve().parent.parent / "data" / "startups.db"
         try:
             rows = search_companies(query, limit=20, db_path=db_path)
         except Exception as exc:  # pragma: no cover - defensive fallback
-            logger.debug("Direct DB search failed for query=%s: %s", query, exc)
+            logger.debug("Direct DB search failed for query=%s: %s", query, str(exc))
             rows = []
         if not rows:
             logger.info("Direct DB search returned 0 rows for query=%s strategy=%s", query, strategy)
