@@ -12,6 +12,8 @@ from google.genai import types
 from shared.llm_adapter import chat_completion as _openrouter_chat_completion_sync
 from shared.llm_adapter import chat_completion_async as _openrouter_chat_completion_async
 
+_openrouter_chat_completion = _openrouter_chat_completion_sync
+
 load_dotenv()
 
 _lock = threading.Lock()
@@ -88,14 +90,14 @@ class _OpenRouterLlm(BaseLlm):
 
         async def _run() -> AsyncIterator[LlmResponse]:
             try:
-                result = _openrouter_chat_completion(
-                    messages=messages,
-                    model=model,
-                    api_key=self._key,
-                    base_url=self._base,
-                    timeout=60.0,
-                    max_retries=3,
-                )
+                    result = await _openrouter_chat_completion_async(
+                        messages=messages,
+                        model=model,
+                        api_key=self._key,
+                        base_url=self._base,
+                        timeout=60.0,
+                        max_retries=3,
+                    )
             except Exception as exc:
                 raise RuntimeError(f"OpenRouter request failed: {exc}") from exc
 
