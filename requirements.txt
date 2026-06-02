@@ -1,6 +1,5 @@
 # Agent framework
-google-adk>=0.2.0
-
+google-adk[extensions]>=1.10.0
 # UI
 gradio>=5.0
 

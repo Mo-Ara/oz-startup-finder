@@ -51,10 +51,6 @@ try:
 except Exception as _IMPORT_ERROR:  # pragma: no cover - diagnostic only
     _IMPORT_OK = False
 
-if not _IMPORT_OK:
-    print("APP_STARTUP_ERROR:", repr(_IMPORT_ERROR))
-else:
-    print("APP_STARTUP_OK")
 import gradio as gr  # noqa: E402
 
 
