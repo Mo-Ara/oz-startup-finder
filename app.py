@@ -41,8 +41,21 @@ try:
 except Exception as exc:  # pragma: no cover - diagnostic only
     print("ADK_DIAG InvocationContext inspection failed:", exc)
 
+try:
+    from google.adk import Runner
+    from google.adk.agents import LlmAgent
+    from google.adk.runners import InvocationContext
+    from agents.orchestrator import OzStartupFinderPipeline
+    _IMPORT_OK = True
+    _IMPORT_ERROR = None
+except Exception as _IMPORT_ERROR:  # pragma: no cover - diagnostic only
+    _IMPORT_OK = False
+
+if not _IMPORT_OK:
+    print("APP_STARTUP_ERROR:", repr(_IMPORT_ERROR))
+else:
+    print("APP_STARTUP_OK")
 import gradio as gr  # noqa: E402
-from agents.orchestrator import OzStartupFinderPipeline  # noqa: E402
 
 
 def _location(lead: dict) -> str:
