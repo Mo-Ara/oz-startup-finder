@@ -112,7 +112,22 @@ with gr.Blocks(title="oz-startup-finder") as demo:
 
         state = None
         try:
-            state = await pipeline.run(q)
+            async for state in pipeline.run(q):
+                router_output = state.router_output or {}
+                trace_out = "\n".join([
+                    f"### 2. Router\n```\n{_maybe_json(router_output)}\n```",
+                    f"### 3. Retrieval\n```\nretrieved: {len(state.retrieved_candidates or [])}\n```",
+                    f"### 4. Enrichment\n```\nenriched: {len(state.enriched_leads or [])}\n```",
+                    f"### 5. Scoring\n```\nscored: {len(state.scored_leads or [])}\n```",
+                    f"### 6. Synthesis\n```\n{_maybe_json(state.synthesis or {})}\n```",
+                ])
+                synthesis = state.synthesis or {}
+                summary_out = synthesis.get("summary") or ""
+                leads = synthesis.get("leads_json") or state.enriched_leads or state.scored_leads or []
+                cards = "".join(_lead_card(lead) for lead in leads[:20])
+                results_out = f"<div class='leads-grid'>{cards}</div>" if cards else "<div class='empty-state'>No leads found.</div>"
+                logs_out = "<div class='logs'>Run complete.</div>"
+                yield trace_out, results_out, summary_out, logs_out
         except Exception as exc:
             logs_out = f"<div class='logs'>WORKFLOW_ERROR:\n{traceback.format_exc()}</div>"
             yield f"Workflow failed: {exc}", "<div class='empty-state'>Workflow failed</div>", "", logs_out
