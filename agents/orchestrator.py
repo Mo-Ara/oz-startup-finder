@@ -14,6 +14,7 @@ from agents.synthesizer.agent import build_synthesizer_agent
 from google.adk import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
+from shared.data_loader import search_companies
 
 logger = logging.getLogger(__name__)
 
@@ -191,7 +192,27 @@ class OzStartupFinderPipeline:
 
         if not self.state.retrieved_candidates:
             logger.info("No retrieval candidates found for query=%s", user_query)
-            return self.state
+            self._apply_db_search_state(query=user_query, strategy=strategy)
+            retrieved = self.state.retrieved_candidates
+            if not retrieved:
+                return self.state
+
+        # Normalize each retrieved candidate so downstream agents always see
+        # consistent fields (company_name, industry, company_city, match_score, rationale).
+        self.state.retrieved_candidates = [
+            {
+                "company_name": item.get("company_name"),
+                "industry": item.get("industry"),
+                "company_city": item.get("company_city"),
+                "match_score": item.get("match_score") or item.get("score") or 0,
+                "rationale": item.get("rationale") or item.get("reason") or item.get("fit_reason") or "",
+            }
+            for item in self.state.retrieved_candidates
+            if item.get("company_name")
+        ]
+        if not self.state.retrieved_candidates:
+            logger.info("No normalized retrieval candidates for query=%s", user_query)
+            self._apply_db_search_state(query=user_query, strategy=strategy)
 
         self.state.enriched_leads = []
         for idx, candidate in enumerate(self.state.retrieved_candidates[:10], start=1):
@@ -236,7 +257,10 @@ class OzStartupFinderPipeline:
         )
         scorer_json = _json_from_event_text(scorer_event)
         if isinstance(scorer_json, dict):
-            self.state.scored_leads = scorer_json.get("scored_leads") or scorer_json.get("leads") or []
+            scored = scorer_json.get("scored_leads") or scorer_json.get("leads") or []
+            if not scored and "score" in scorer_json:
+                scored = self._normalize_scorer_output(scorer_json)
+            self.state.scored_leads = scored or self.state.enriched_leads
 
         self.state.synthesis = {}
         synthesis_input_payload = None
@@ -287,6 +311,44 @@ class OzStartupFinderPipeline:
             except Exception:
                 pass
         return {}
+
+    def _normalize_scorer_output(self, data: dict[str, Any]) -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
+        if isinstance(data.get("leads"), list):
+            items = data["leads"]
+        elif isinstance(data.get("scored_leads"), list):
+            items = data["scored_leads"]
+        else:
+            flat = {
+                "relevance_score": data.get("score") or data.get("relevance_score"),
+                "confidence_score": data.get("confidence_score") or data.get("score"),
+                "fit_reason": data.get("feedback") or data.get("fit_reason") or "",
+            }
+            if any(v is not None for v in flat.values()):
+                items = [flat]
+        results: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("company_name") or "").strip()
+            if not name:
+                continue
+            key = name.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            results.append(
+                {
+                    "company_name": name,
+                    "industry": item.get("industry"),
+                    "company_city": item.get("company_city"),
+                    "relevance_narrative": item.get("relevance_narrative") or item.get("rationale") or item.get("fit_reason") or "Matched by retrieval search.",
+                    "relevance_score": item.get("relevance_score") or item.get("match_score") or item.get("score") or 60,
+                    "confidence_score": item.get("confidence_score") or item.get("confidence") or item.get("score") or 60,
+                }
+            )
+        return results
 
     def _fallback_synthesis(self, state: PipelineState) -> dict[str, Any]:
         raw_source = state.scored_leads or state.enriched_leads or state.retrieved_candidates
