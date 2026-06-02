@@ -2,16 +2,12 @@ from __future__ import annotations
 
 import os
 import threading
-from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, Iterator, List
+from typing import Any, AsyncIterator, Dict, Iterator, List
 
 from dataclasses import dataclass
 from dotenv import load_dotenv
 from google.adk.models import LLMRegistry, BaseLlm, LlmRequest, LlmResponse
 from google.genai import types
-
-if TYPE_CHECKING:
-    from openai import AsyncOpenAI
-    from openai import OpenAI
 
 load_dotenv()
 
@@ -53,33 +49,37 @@ class _OpenRouterLlm(BaseLlm):
         c = _cfg()
         self._key = c.api_key
         self._base = c.base_url.rstrip("/")
-        self._async_client: AsyncOpenAI | None = None
-        self._sync_client: OpenAI | None = None
+        self._async_client: Any = None
+        self._sync_client: Any = None
 
     @property
     def support_system_prompt(self) -> bool:
         return True
 
-    def _async_client_impl(self) -> AsyncOpenAI:
+    def _async_client_impl(self) -> Any:
         if self._async_client is None:
             if not self._key:
                 raise RuntimeError(
                     "OPENROUTER_API_KEY is not set. "
                     "Set it in .env or Space secrets."
                 )
+            from openai import AsyncOpenAI
+
             self._async_client = AsyncOpenAI(
                 api_key=self._key,
                 base_url=self._base,
             )
         return self._async_client
 
-    def _sync_client_impl(self) -> OpenAI:
+    def _sync_client_impl(self) -> Any:
         if self._sync_client is None:
             if not self._key:
                 raise RuntimeError(
                     "OPENROUTER_API_KEY is not set. "
                     "Set it in .env or Space secrets."
                 )
+            from openai import OpenAI
+
             self._sync_client = OpenAI(
                 api_key=self._key,
                 base_url=self._base,
@@ -88,9 +88,6 @@ class _OpenRouterLlm(BaseLlm):
 
     def _msgs(self, llm_request: LlmRequest) -> List[Dict[str, str]]:
         messages: List[Dict[str, str]] = []
-
-        # ADK 1.10.0 stores system instruction as a plain string
-        # in GenerateContentConfig, not as a separate Content object.
         system_text = ""
         try:
             cfg = llm_request.config or types.GenerateContentConfig()
@@ -117,7 +114,6 @@ class _OpenRouterLlm(BaseLlm):
     ) -> AsyncIterator[LlmResponse]:
         messages = self._msgs(llm_request)
         model = _effective_model()
-
         client = self._async_client_impl()
 
         async def _run() -> AsyncIterator[LlmResponse]:
@@ -145,7 +141,6 @@ class _OpenRouterLlm(BaseLlm):
     ) -> Iterator[LlmResponse]:
         messages = self._msgs(llm_request)
         model = _effective_model()
-
         client = self._sync_client_impl()
 
         def _run() -> Iterator[LlmResponse]:
