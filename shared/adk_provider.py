@@ -92,6 +92,8 @@ class _OpenRouterLlm(BaseLlm):
                     model=model,
                     api_key=self._key,
                     base_url=self._base,
+                    timeout=60.0,
+                    max_retries=3,
                 )
             except Exception as exc:
                 raise RuntimeError(f"OpenRouter request failed: {exc}") from exc
@@ -121,6 +123,8 @@ class _OpenRouterLlm(BaseLlm):
                     model=model,
                     api_key=self._key,
                     base_url=self._base,
+                    timeout=60.0,
+                    max_retries=3,
                 )
             except Exception as exc:
                 raise RuntimeError(f"OpenRouter request failed: {exc}") from exc
