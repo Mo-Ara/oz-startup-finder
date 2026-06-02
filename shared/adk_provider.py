@@ -13,7 +13,10 @@ _registered = False
 
 
 def _get_openrouter_model() -> str:
-    return os.getenv("OPENROUTER_MODEL", "openrouter/free").strip()
+    raw = os.getenv("OPENROUTER_MODEL", "openrouter/free").strip()
+    if not raw.startswith("openrouter/"):
+        raw = f"openrouter/{raw}"
+    return raw
 
 
 def _load_lite_llm_class():  # pragma: no cover - runtime compatibility helper
