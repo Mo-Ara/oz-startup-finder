@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from dotenv import load_dotenv
 from google.adk.models import LLMRegistry, BaseLlm, LlmRequest, LlmResponse
 from google.genai import types
+from shared.llm_adapter import chat_completion as _openrouter_chat_completion
 
 load_dotenv()
 
@@ -49,42 +50,10 @@ class _OpenRouterLlm(BaseLlm):
         c = _cfg()
         self._key = c.api_key
         self._base = c.base_url.rstrip("/")
-        self._async_client: Any = None
-        self._sync_client: Any = None
 
     @property
     def support_system_prompt(self) -> bool:
         return True
-
-    def _async_client_impl(self) -> Any:
-        if self._async_client is None:
-            if not self._key:
-                raise RuntimeError(
-                    "OPENROUTER_API_KEY is not set. "
-                    "Set it in .env or Space secrets."
-                )
-            from openai import AsyncOpenAI
-
-            self._async_client = AsyncOpenAI(
-                api_key=self._key,
-                base_url=self._base,
-            )
-        return self._async_client
-
-    def _sync_client_impl(self) -> Any:
-        if self._sync_client is None:
-            if not self._key:
-                raise RuntimeError(
-                    "OPENROUTER_API_KEY is not set. "
-                    "Set it in .env or Space secrets."
-                )
-            from openai import OpenAI
-
-            self._sync_client = OpenAI(
-                api_key=self._key,
-                base_url=self._base,
-            )
-        return self._sync_client
 
     def _msgs(self, llm_request: LlmRequest) -> List[Dict[str, str]]:
         messages: List[Dict[str, str]] = []
@@ -114,23 +83,19 @@ class _OpenRouterLlm(BaseLlm):
     ) -> AsyncIterator[LlmResponse]:
         messages = self._msgs(llm_request)
         model = _effective_model()
-        client = self._async_client_impl()
 
         async def _run() -> AsyncIterator[LlmResponse]:
             try:
-                response = await client.chat.completions.create(
-                    model=model,
+                result = _openrouter_chat_completion(
                     messages=messages,
+                    model=model,
+                    api_key=self._key,
+                    base_url=self._base,
                 )
             except Exception as exc:
-                status = getattr(exc, "status_code", None) or getattr(getattr(exc, "response", None), "status_code", None)
-                if status == 400:
-                    raise RuntimeError(
-                        f"OpenRouter rejected the model '{model}'. "
-                        f"Set OPENROUTER_MODEL in .env to a valid model ID like 'openrouter/free'."
-                    ) from exc
                 raise RuntimeError(f"OpenRouter request failed: {exc}") from exc
-            text = response.choices[0].message.content or ""
+
+            text = (result.get("content") or "").strip()
             yield LlmResponse(
                 content=types.Content(
                     role="model",
@@ -147,14 +112,19 @@ class _OpenRouterLlm(BaseLlm):
     ) -> Iterator[LlmResponse]:
         messages = self._msgs(llm_request)
         model = _effective_model()
-        client = self._sync_client_impl()
 
         def _run() -> Iterator[LlmResponse]:
-            response = client.chat.completions.create(
-                model=model,
-                messages=messages,
-            )
-            text = response.choices[0].message.content or ""
+            try:
+                result = _openrouter_chat_completion(
+                    messages=messages,
+                    model=model,
+                    api_key=self._key,
+                    base_url=self._base,
+                )
+            except Exception as exc:
+                raise RuntimeError(f"OpenRouter request failed: {exc}") from exc
+
+            text = (result.get("content") or "").strip()
             yield LlmResponse(
                 content=types.Content(
                     role="model",

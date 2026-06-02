@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 
 from agents.clarifying.agent import build_clarifying_agent
@@ -11,6 +12,8 @@ from agents.synthesizer.agent import build_synthesizer_agent
 from google.adk import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -25,22 +28,38 @@ class PipelineState:
 
 
 async def _create_session(session_service: InMemorySessionService, session_id: str) -> None:
+    logger.info("Creating session: %s", session_id)
     await session_service.create_session(session_id=session_id, app_name="oz-startup-finder", user_id="local-user")
 
 
-async def _consume(runner: Runner, *, user_id: str, session_id: str, new_message: str):
+async def _consume(runner: Runner, *, user_id: str, session_id: str, new_message: str, label: str):
     await _create_session(runner.session_service, session_id)
-    latest = None
     content = types.Content(
         role="user",
         parts=[types.Part(text=new_message)],
     )
-    async for event in runner.run_async(
-        user_id=user_id,
-        session_id=session_id,
-        new_message=content,
-    ):
-        latest = event
+    latest = None
+    event_count = 0
+    logger.info("Stage %s: start session=%s", label, session_id)
+    try:
+        async for event in runner.run_async(
+            user_id=user_id,
+            session_id=session_id,
+            new_message=content,
+        ):
+            event_count += 1
+            latest = event
+    except Exception as exc:
+        logger.error("Stage %s failed in session=%s: %s", label, session_id, exc, exc_info=True)
+        raise RuntimeError(f"Stage '{label}' failed in session '{session_id}': {exc}") from exc
+
+    logger.info(
+        "Stage %s: complete session=%s events=%s latest=%s",
+        label,
+        session_id,
+        event_count,
+        getattr(latest, "__class__", type(latest)).__name__,
+    )
     return latest
 
 
@@ -61,91 +80,72 @@ class OzStartupFinderPipeline:
     async def run(self, user_query: str) -> PipelineState:
         self.state.user_query = user_query
 
-        clarifying_session = Runner(
-            agent=self.clarifying_agent,
-            session_service=self.session_service,
-            app_name="oz-startup-finder",
-        )
+        logger.info("Pipeline start query=%s", user_query)
+
         clarifying_out = await _consume(
-            clarifying_session,
+            Runner(agent=self.clarifying_agent, session_service=self.session_service, app_name="oz-startup-finder"),
             user_id="local-user",
             session_id=f"{self.session_id}:clarifying",
             new_message=user_query,
+            label="clarifying",
         )
         self._assign("clarifying_questions", getattr(clarifying_out, "follow_up_questions", []))
         if self._needs_clarification():
+            logger.info("Clarification required; pipeline paused for user input.")
             return self.state
 
-        router_session = Runner(
-            agent=self.router_agent,
-            session_service=self.session_service,
-            app_name="oz-startup-finder",
-        )
         router_out = await _consume(
-            router_session,
+            Runner(agent=self.router_agent, session_service=self.session_service, app_name="oz-startup-finder"),
             user_id="local-user",
             session_id=f"{self.session_id}:router",
             new_message=user_query,
+            label="router",
         )
         self._assign("router_output", getattr(router_out, "structured_output", {}))
 
-        retriever_session = Runner(
-            agent=self.retriever_agent,
-            session_service=self.session_service,
-            app_name="oz-startup-finder",
-        )
         retrieval_out = await _consume(
-            retriever_session,
+            Runner(agent=self.retriever_agent, session_service=self.session_service, app_name="oz-startup-finder"),
             user_id="local-user",
             session_id=f"{self.session_id}:retriever",
             new_message=user_query,
+            label="retriever",
         )
         self._assign("retrieved_candidates", getattr(retrieval_out, "top_matches", []))
 
         enriched: list[dict] = []
-        for candidate in self.state.retrieved_candidates[:10]:
-            enriched_session = Runner(
-                agent=self.enricher_agent,
-                session_service=self.session_service,
-                app_name="oz-startup-finder",
-            )
+        for idx, candidate in enumerate(self.state.retrieved_candidates[:10], start=1):
+            label = f"enricher:{idx}"
             enriched_out = await _consume(
-                enriched_session,
+                Runner(agent=self.enricher_agent, session_service=self.session_service, app_name="oz-startup-finder"),
                 user_id="local-user",
                 session_id=f"{self.session_id}:enricher:{candidate.get('company_name', 'unknown')}",
                 new_message=user_query,
+                label=label,
             )
             payload = getattr(enriched_out, "structured_output", {})
             payload.setdefault("company_name", candidate.get("company_name"))
             enriched.append(payload)
         self._assign("enriched_leads", enriched)
 
-        scorer_session = Runner(
-            agent=self.scorer_agent,
-            session_service=self.session_service,
-            app_name="oz-startup-finder",
-        )
         scorer_out = await _consume(
-            scorer_session,
+            Runner(agent=self.scorer_agent, session_service=self.session_service, app_name="oz-startup-finder"),
             user_id="local-user",
             session_id=f"{self.session_id}:scorer",
             new_message=user_query,
+            label="scorer",
         )
         self._assign("scored_leads", getattr(scorer_out, "scored_leads", []))
 
-        synthesizer_session = Runner(
-            agent=self.synthesizer_agent,
-            session_service=self.session_service,
-            app_name="oz-startup-finder",
-        )
         synthesizer_out = await _consume(
-            synthesizer_session,
+            Runner(agent=self.synthesizer_agent, session_service=self.session_service, app_name="oz-startup-finder"),
             user_id="local-user",
             session_id=f"{self.session_id}:synthesizer",
             new_message=user_query,
+            label="synthesizer",
         )
         self._assign("synthesis", getattr(synthesizer_out, "structured_output", {}))
 
+        logger.info("Pipeline complete")
         return self.state
 
     def _needs_clarification(self) -> bool:
