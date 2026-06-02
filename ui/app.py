@@ -59,11 +59,15 @@ def format_results(state: PipelineState) -> str:
 
 async def run_workflow(query: str):
     pipeline = OzStartupFinderPipeline()
+    state = pipeline.state
+    trace_text = "\n".join(build_workflow_steps(state))
+    csv_markdown = "No export available."
+    yield trace_text, "Running pipeline...", csv_markdown
+
     state = await pipeline.run(query)
     trace_text = "\n".join(build_workflow_steps(state))
     results_md = format_results(state)
-    csv_markdown = "No export available."
-    return trace_text, results_md, csv_markdown
+    yield trace_text, results_md, csv_markdown
 
 
 def export_csv(state: PipelineState) -> str:
