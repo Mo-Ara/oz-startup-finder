@@ -23,6 +23,22 @@ class PipelineState:
     synthesis: dict = field(default_factory=dict)
 
 
+def _create_session(session_service: InMemorySessionService, session_id: str) -> None:
+    session_service.create_session(session_id=session_id)
+
+
+def _consume(runner: Runner, *, user_id: str, session_id: str, new_message: str):
+    _create_session(runner.session_service, session_id)
+    latest = None
+    for event in runner.run(
+        user_id=user_id,
+        session_id=session_id,
+        new_message=new_message,
+    ):
+        latest = event
+    return latest
+
+
 class OzStartupFinderPipeline:
     def __init__(self, session_id: str | None = None, model: str | None = None) -> None:
         self.model = model
@@ -132,14 +148,3 @@ class OzStartupFinderPipeline:
 
     def _assign(self, field_name: str, value: object) -> None:
         object.__setattr__(self.state, field_name, value)
-
-
-def _consume(runner: Runner, *, user_id: str, session_id: str, new_message: str):
-    latest = None
-    for event in runner.run(
-        user_id=user_id,
-        session_id=session_id,
-        new_message=new_message,
-    ):
-        latest = event
-    return latest
