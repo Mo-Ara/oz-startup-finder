@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from google.adk.agents import LlmAgent
 
-from shared.llm_factory import get_model_name
+from shared.adk_provider import get_model_name
 from shared.prompts.synthesizer import SYNTHESIZER_SYSTEM_PROMPT
 
 

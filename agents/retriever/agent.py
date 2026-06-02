@@ -1,6 +1,6 @@
 from google.adk.agents import LlmAgent
 
-from shared.llm_factory import get_model_name
+from shared.adk_provider import get_model_name
 from shared.tools.db_search import db_search
 
 
