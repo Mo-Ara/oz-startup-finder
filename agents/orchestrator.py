@@ -60,6 +60,32 @@ async def _consume(runner: Runner, *, user_id: str, session_id: str, new_message
         event_count,
         getattr(latest, "__class__", type(latest)).__name__,
     )
+
+    # DEBUG: show the actual event API surface so we can migrate the code below.
+    try:
+        attrs = sorted(
+            a for a in getattr(latest, "__dir__", lambda: [])() if not a.startswith("_")
+        )
+    except Exception:
+        attrs = sorted(a for a in dir(latest) if not a.startswith("_"))
+    print(
+        "DEBUG_EVENT type=",
+        type(latest).__name__,
+        "attrs=",
+        attrs,
+        flush=True,
+    )
+    try:
+        maybe_content = getattr(latest, "content", None) or getattr(latest, "event", None)
+        if hasattr(maybe_content, "parts"):
+            print(
+                "DEBUG_EVENT content.parts=",
+                getattr(maybe_content, "parts", []),
+                flush=True,
+            )
+    except Exception as _exc:
+        print("DEBUG_EVENT content inspect failed:", _exc, flush=True)
+
     return latest
 
 

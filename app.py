@@ -56,7 +56,10 @@ except Exception as exc:
     )
     traceback.print_exc()
 
+import logging
 import gradio as gr  # noqa: E402
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s", force=True)
 
 
 def _location(lead: dict) -> str:
@@ -130,12 +133,33 @@ def build_trace_md(state) -> str:
     return "\n".join(items)
 
 
+def _extract_text_from_event(result) -> str:
+    if result is None:
+        return ""
+    text = getattr(result, "text", None)
+    if text:
+        return str(text)
+    content = getattr(result, "content", None)
+    if content is None:
+        content = getattr(result, "event", None)
+    parts = getattr(content, "parts", None) or []
+    texts = []
+    for part in parts:
+        value = getattr(part, "text", None)
+        if value:
+            texts.append(str(value))
+    return "\n".join(texts).strip()
+
+
 async def run_workflow(query: str):
     if not query or not query.strip():
         return "", build_leads_html([]), ""
 
+    print(f"WORKFLOW_START query={query!r}", flush=True)
     try:
+        print("PIPELINE_INIT start", flush=True)
         pipeline = OzStartupFinderPipeline()
+        print("PIPELINE_INIT done", flush=True)
         state = await pipeline.run(query)
     except Exception as exc:
         tb = traceback.format_exc()
@@ -147,6 +171,17 @@ async def run_workflow(query: str):
     summary = synthesis.get("summary", "") if synthesis else ""
     leads = synthesis.get("leads_json", [])[:20] if synthesis else []
     body = build_leads_html(leads)
+
+    print(
+        "UI_RETURN summary_len=",
+        len(summary or ""),
+        "leads=",
+        len(leads or []),
+        "trace_len=",
+        len(trace_md or ""),
+        flush=True,
+    )
+    print("UI_TRACE:", trace_md, flush=True)
 
     return summary, body, trace_md
 
