@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass, field
+from typing import Any
 
 from agents.clarifying.agent import build_clarifying_agent
 from agents.enricher.agent import build_enricher_agent
@@ -32,7 +34,50 @@ async def _create_session(session_service: InMemorySessionService, session_id: s
     await session_service.create_session(session_id=session_id, app_name="oz-startup-finder", user_id="local-user")
 
 
-async def _consume(runner: Runner, *, user_id: str, session_id: str, new_message: str, label: str):
+def _text_from_event(event: Any) -> str:
+    try:
+        content = getattr(event, "content", None)
+        if content is None:
+            return ""
+        parts = getattr(content, "parts", None) or []
+        texts = []
+        for part in parts:
+            value = getattr(part, "text", None)
+            if value:
+                texts.append(value)
+        return "\n".join(texts).strip()
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.debug("Failed to extract text from event: %s", exc)
+        return ""
+
+
+def _json_from_event_text(event: Any) -> Any:
+    raw = _text_from_event(event)
+    if not raw:
+        return {}
+    try:
+        stripped = raw.strip()
+        if stripped.startswith("```"):
+            stripped = stripped.strip("`")
+            if "\n" in stripped:
+                stripped = stripped.split("\n", 1)[1]
+                if stripped.endswith("```"):
+                    stripped = stripped[:-3]
+            stripped = stripped.strip()
+        return json.loads(stripped)
+    except Exception as exc:  # pragma: no cover - best effort parsing
+        logger.debug("Failed to parse JSON from event text: %s\n%s", exc, raw)
+        return {}
+
+
+def _assign(state: PipelineState, field_name: str, value: Any) -> None:
+    try:
+        object.__setattr__(state, field_name, value)
+    except Exception as exc:
+        logger.debug("Failed to assign %s: %s", field_name, exc)
+
+
+async def _consume(runner: Runner, *, user_id: str, session_id: str, new_message: str, label: str) -> Any:
     await _create_session(runner.session_service, session_id)
     content = types.Content(
         role="user",
@@ -60,32 +105,6 @@ async def _consume(runner: Runner, *, user_id: str, session_id: str, new_message
         event_count,
         getattr(latest, "__class__", type(latest)).__name__,
     )
-
-    # DEBUG: show the actual event API surface so we can migrate the code below.
-    try:
-        attrs = sorted(
-            a for a in getattr(latest, "__dir__", lambda: [])() if not a.startswith("_")
-        )
-    except Exception:
-        attrs = sorted(a for a in dir(latest) if not a.startswith("_"))
-    print(
-        "DEBUG_EVENT type=",
-        type(latest).__name__,
-        "attrs=",
-        attrs,
-        flush=True,
-    )
-    try:
-        maybe_content = getattr(latest, "content", None) or getattr(latest, "event", None)
-        if hasattr(maybe_content, "parts"):
-            print(
-                "DEBUG_EVENT content.parts=",
-                getattr(maybe_content, "parts", []),
-                flush=True,
-            )
-    except Exception as _exc:
-        print("DEBUG_EVENT content inspect failed:", _exc, flush=True)
-
     return latest
 
 
@@ -104,78 +123,84 @@ class OzStartupFinderPipeline:
         self.synthesizer_agent = build_synthesizer_agent(model=self.model)
 
     async def run(self, user_query: str) -> PipelineState:
-        self.state.user_query = user_query
-
+        self.state = PipelineState(user_query=user_query)
         logger.info("Pipeline start query=%s", user_query)
 
-        clarifying_out = await _consume(
+        clarifying_event = await _consume(
             Runner(agent=self.clarifying_agent, session_service=self.session_service, app_name="oz-startup-finder"),
             user_id="local-user",
             session_id=f"{self.session_id}:clarifying",
             new_message=user_query,
             label="clarifying",
         )
-        self._assign("clarifying_questions", getattr(clarifying_out, "follow_up_questions", []))
-        if self._needs_clarification():
-            logger.info("Clarification required; pipeline paused for user input.")
-            return self.state
+        clarifying_json = _json_from_event_text(clarifying_event)
+        clarifying_text = _text_from_event(clarifying_event)
+        questions = clarifying_json.get("questions") or clarifying_json.get("follow_up_questions") or []
+        if isinstance(questions, str):
+            questions = [questions]
+        _assign(self.state, "clarifying_questions", [str(item) for item in questions])
 
-        router_out = await _consume(
+        router_event = await _consume(
             Runner(agent=self.router_agent, session_service=self.session_service, app_name="oz-startup-finder"),
             user_id="local-user",
             session_id=f"{self.session_id}:router",
             new_message=user_query,
             label="router",
         )
-        self._assign("router_output", getattr(router_out, "structured_output", {}))
+        router_json = _json_from_event_text(router_event)
+        _assign(self.state, "router_output", router_json if isinstance(router_json, dict) else {})
 
-        retrieval_out = await _consume(
+        retrieval_event = await _consume(
             Runner(agent=self.retriever_agent, session_service=self.session_service, app_name="oz-startup-finder"),
             user_id="local-user",
             session_id=f"{self.session_id}:retriever",
             new_message=user_query,
             label="retriever",
         )
-        self._assign("retrieved_candidates", getattr(retrieval_out, "top_matches", []))
+        retrieval_json = _json_from_event_text(retrieval_event)
+        retrieved = retrieval_json.get("top_matches") if isinstance(retrieval_json, dict) else None
+        _assign(self.state, "retrieved_candidates", retrieved or [])
+
+        if not self.state.retrieved_candidates:
+            logger.info("No retrieval candidates; skipping enrichment/scoring/synthesis.")
+            logger.info("Pipeline incomplete: retrieval returned no candidates")
+            return self.state
 
         enriched: list[dict] = []
         for idx, candidate in enumerate(self.state.retrieved_candidates[:10], start=1):
             label = f"enricher:{idx}"
-            enriched_out = await _consume(
+            enriched_event = await _consume(
                 Runner(agent=self.enricher_agent, session_service=self.session_service, app_name="oz-startup-finder"),
                 user_id="local-user",
                 session_id=f"{self.session_id}:enricher:{candidate.get('company_name', 'unknown')}",
                 new_message=user_query,
                 label=label,
             )
-            payload = getattr(enriched_out, "structured_output", {})
+            enriched_json = _json_from_event_text(enriched_event)
+            payload = enriched_json if isinstance(enriched_json, dict) else {}
             payload.setdefault("company_name", candidate.get("company_name"))
             enriched.append(payload)
-        self._assign("enriched_leads", enriched)
+        _assign(self.state, "enriched_leads", enriched)
 
-        scorer_out = await _consume(
+        scorer_event = await _consume(
             Runner(agent=self.scorer_agent, session_service=self.session_service, app_name="oz-startup-finder"),
             user_id="local-user",
             session_id=f"{self.session_id}:scorer",
             new_message=user_query,
             label="scorer",
         )
-        self._assign("scored_leads", getattr(scorer_out, "scored_leads", []))
+        scorer_json = _json_from_event_text(scorer_event)
+        _assign(self.state, "scored_leads", (scorer_json.get("scored_leads") or []) if isinstance(scorer_json, dict) else [])
 
-        synthesizer_out = await _consume(
+        synthesizer_event = await _consume(
             Runner(agent=self.synthesizer_agent, session_service=self.session_service, app_name="oz-startup-finder"),
             user_id="local-user",
             session_id=f"{self.session_id}:synthesizer",
             new_message=user_query,
             label="synthesizer",
         )
-        self._assign("synthesis", getattr(synthesizer_out, "structured_output", {}))
+        synthesizer_json = _json_from_event_text(synthesizer_event)
+        _assign(self.state, "synthesis", synthesizer_json if isinstance(synthesizer_json, dict) else {})
 
         logger.info("Pipeline complete")
         return self.state
-
-    def _needs_clarification(self) -> bool:
-        return bool(self.state.clarifying_questions)
-
-    def _assign(self, field_name: str, value: object) -> None:
-        object.__setattr__(self.state, field_name, value)
