@@ -4,6 +4,7 @@ emoji: 🔍
 colorFrom: blue
 colorTo: purple
 sdk: gradio
+sdk_version: 5.0
 app_file: app.py
 pinned: false
 ---
@@ -55,7 +56,7 @@ Build `data/startups.db` locally with `scripts/seed_demo.py` or `scripts/build_k
 
 ```bash
 python -m scripts.seed_demo
-python ui/app.py
+python app.py
 ```
 
 ## Live Demo

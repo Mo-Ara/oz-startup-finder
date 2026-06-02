@@ -14,4 +14,4 @@ COPY . .
 
 EXPOSE 7860
 
-CMD ["python", "ui/app.py"]
+CMD ["python", "app.py"]
