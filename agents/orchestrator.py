@@ -43,7 +43,6 @@ class OzStartupFinderPipeline:
             agent=self.clarifying_agent,
             session_service=self.session_service,
             app_name="oz-startup-finder",
-            session_id=f"{self.session_id}:clarifying",
         )
         clarifying_out = await clarifying_session.run(
             user_id="local-user",
@@ -58,7 +57,6 @@ class OzStartupFinderPipeline:
             agent=self.router_agent,
             session_service=self.session_service,
             app_name="oz-startup-finder",
-            session_id=f"{self.session_id}:router",
         )
         router_out = await router_session.run(
             user_id="local-user",
@@ -71,7 +69,6 @@ class OzStartupFinderPipeline:
             agent=self.retriever_agent,
             session_service=self.session_service,
             app_name="oz-startup-finder",
-            session_id=f"{self.session_id}:retriever",
         )
         retrieval_out = await retriever_session.run(
             user_id="local-user",
@@ -86,7 +83,6 @@ class OzStartupFinderPipeline:
                 agent=self.enricher_agent,
                 session_service=self.session_service,
                 app_name="oz-startup-finder",
-                session_id=f"{self.session_id}:enricher:{candidate.get('company_name', 'unknown')}",
             )
             enriched_out = await enriched_session.run(
                 user_id="local-user",
