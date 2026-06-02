@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from agents.clarifying.agent import build_clarifying_agent
@@ -295,6 +296,38 @@ class OzStartupFinderPipeline:
         logger.info("Pipeline complete")
         return self.state
 
+    def _apply_db_search_state(self, *, query: str, strategy: str) -> None:
+        db_path = Path(__file__).resolve().parent.parent / "data" / "startups.db"
+        try:
+            rows = search_companies(query, limit=20, db_path=db_path)
+        except Exception as exc:  # pragma: no cover - defensive fallback
+            logger.debug("Direct DB search failed for query=%s: %s", query, exc)
+            rows = []
+        if not rows:
+            logger.info("Direct DB search returned 0 rows for query=%s strategy=%s", query, strategy)
+            return
+        self.state.retrieved_candidates = [
+            {
+                "company_name": row.get("company_name"),
+                "industry": row.get("industry"),
+                "company_city": row.get("company_city"),
+                "match_score": row.get("rank") or row.get("match_score") or 0,
+                "rationale": f"DB search via {strategy}",
+            }
+            for row in rows
+            if row.get("company_name")
+        ]
+        self.state.retrieval_raw_text = json.dumps(
+            {"tool_used": "direct_search_companies", "query": query, "results": self.state.retrieved_candidates},
+            ensure_ascii=False,
+        )
+        logger.info(
+            "Direct DB search recovered %s candidates for query=%s strategy=%s",
+            len(self.state.retrieved_candidates),
+            query,
+            strategy,
+        )
+
     def _coerce_retrieval_output(self, raw: str) -> Any:
         if not raw:
             return {}
@@ -320,6 +353,7 @@ class OzStartupFinderPipeline:
             items = data["scored_leads"]
         else:
             flat = {
+                "company_name": data.get("company_name"),
                 "relevance_score": data.get("score") or data.get("relevance_score"),
                 "confidence_score": data.get("confidence_score") or data.get("score"),
                 "fit_reason": data.get("feedback") or data.get("fit_reason") or "",
