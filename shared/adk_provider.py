@@ -43,4 +43,4 @@ def _register_openrouter(model_name: str) -> None:
 
 def get_model_name() -> str:
     _register_openrouter("openrouter/.*$")
-    return _get_openrouter()
+    return _get_openrouter_model()
