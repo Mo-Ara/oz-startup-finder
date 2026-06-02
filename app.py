@@ -139,8 +139,8 @@ async def run_workflow(query: str):
         state = await pipeline.run(query)
     except Exception as exc:
         tb = traceback.format_exc()
-        print("WORKFLOW_ERROR:", tb)
-        return f"Workflow failed: {exc}", build_leads_html([]), f"```\n{tb}\n```"
+        print("WORKFLOW_ERROR:", tb, flush=True)
+        return f"Workflow failed: {exc}", build_leads_html([]), tb
 
     trace_md = build_trace_md(state) if state else ""
     synthesis = state.synthesis if state else None
@@ -178,6 +178,7 @@ with gr.Blocks(title="oz-startup-finder") as demo:
             label="",
             placeholder="Describe the startup niche you're looking for, e.g. 'AI code review tools in Melbourne'",
             scale=8,
+            show_label=False,
         )
         run = gr.Button("Run workflow", variant="primary", scale=2)
 
