@@ -24,7 +24,7 @@ class PipelineState:
 
 
 def _create_session(session_service: InMemorySessionService, session_id: str) -> None:
-    session_service.create_session(session_id=session_id)
+    session_service.create_session(session_id=session_id, app_name="oz-startup-finder", user_id="local-user")
 
 
 def _consume(runner: Runner, *, user_id: str, session_id: str, new_message: str):
