@@ -23,12 +23,12 @@ class PipelineState:
     synthesis: dict = field(default_factory=dict)
 
 
-def _create_session(session_service: InMemorySessionService, session_id: str) -> None:
-    session_service.create_session(session_id=session_id, app_name="oz-startup-finder", user_id="local-user")
+async def _create_session(session_service: InMemorySessionService, session_id: str) -> None:
+    await session_service.create_session(session_id=session_id, app_name="oz-startup-finder", user_id="local-user")
 
 
-def _consume(runner: Runner, *, user_id: str, session_id: str, new_message: str):
-    _create_session(runner.session_service, session_id)
+async def _consume(runner: Runner, *, user_id: str, session_id: str, new_message: str):
+    await _create_session(runner.session_service, session_id)
     latest = None
     for event in runner.run(
         user_id=user_id,
@@ -61,7 +61,7 @@ class OzStartupFinderPipeline:
             session_service=self.session_service,
             app_name="oz-startup-finder",
         )
-        clarifying_out = _consume(
+        clarifying_out = await _consume(
             clarifying_session,
             user_id="local-user",
             session_id=f"{self.session_id}:clarifying",
@@ -76,7 +76,7 @@ class OzStartupFinderPipeline:
             session_service=self.session_service,
             app_name="oz-startup-finder",
         )
-        router_out = _consume(
+        router_out = await _consume(
             router_session,
             user_id="local-user",
             session_id=f"{self.session_id}:router",
@@ -89,7 +89,7 @@ class OzStartupFinderPipeline:
             session_service=self.session_service,
             app_name="oz-startup-finder",
         )
-        retrieval_out = _consume(
+        retrieval_out = await _consume(
             retriever_session,
             user_id="local-user",
             session_id=f"{self.session_id}:retriever",
@@ -104,7 +104,7 @@ class OzStartupFinderPipeline:
                 session_service=self.session_service,
                 app_name="oz-startup-finder",
             )
-            enriched_out = _consume(
+            enriched_out = await _consume(
                 enriched_session,
                 user_id="local-user",
                 session_id=f"{self.session_id}:enricher:{candidate.get('company_name', 'unknown')}",
@@ -120,7 +120,7 @@ class OzStartupFinderPipeline:
             session_service=self.session_service,
             app_name="oz-startup-finder",
         )
-        scorer_out = _consume(
+        scorer_out = await _consume(
             scorer_session,
             user_id="local-user",
             session_id=f"{self.session_id}:scorer",
@@ -133,7 +133,7 @@ class OzStartupFinderPipeline:
             session_service=self.session_service,
             app_name="oz-startup-finder",
         )
-        synthesizer_out = _consume(
+        synthesizer_out = await _consume(
             synthesizer_session,
             user_id="local-user",
             session_id=f"{self.session_id}:synthesizer",
