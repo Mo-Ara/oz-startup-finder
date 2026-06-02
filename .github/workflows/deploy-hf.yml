@@ -22,19 +22,52 @@ jobs:
           python -m pip install --upgrade pip
           pip install huggingface_hub
 
-      - name: Upload Space assets
+      - name: Deploy to HF Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_SPACE_REPO_ID: ${{ secrets.HF_SPACE_REPO_ID }}
         run: |
-          for i in 1 2 3; do
-            hf upload "$HF_SPACE_REPO_ID" . . \
-              --repo-type space \
-              --exclude "*.db" \
-              --exclude "*.csv" \
-              --exclude ".git/*" \
-              --exclude ".venv/*" \
-              --exclude "__pycache__/*" && break
-            echo "hf upload failed (attempt $i), retrying in $((i * 10))s..."
-            sleep $((i * 10))
-          done
+          python - <<'PY'
+          import os
+          import time
+
+          from huggingface_hub import HfApi, create_repo
+
+          repo_id = os.environ["HF_SPACE_REPO_ID"]
+          token = os.environ["HF_TOKEN"]
+          api = HfApi(token=token)
+
+          for attempt in range(1, 4):
+              try:
+                  create_repo(
+                      repo_id=repo_id,
+                      token=token,
+                      repo_type="space",
+                      space_sdk="gradio",
+                      exist_ok=True,
+                  )
+                  break
+              except Exception as exc:
+                  message = str(getattr(exc, "response", exc))
+                  if attempt == 3 or "429" not in message:
+                      raise
+                  time.sleep(attempt * 10)
+
+          api.upload_folder(
+              folder_path=".",
+              repo_id=repo_id,
+              repo_type="space",
+              ignore_patterns=[
+                  "*.db",
+                  "*.csv",
+                  ".git/*",
+                  ".venv/*",
+                  "__pycache__/*",
+              ],
+          )
+
+          try:
+              api.restart_space(repo_id=repo_id, token=token)
+          except Exception as exc:
+              print(f"Space restart failed: {exc}")
+          PY
