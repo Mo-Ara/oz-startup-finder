@@ -30,10 +30,11 @@ async def _create_session(session_service: InMemorySessionService, session_id: s
 async def _consume(runner: Runner, *, user_id: str, session_id: str, new_message: str):
     await _create_session(runner.session_service, session_id)
     latest = None
+    payload = {"role": "user", "parts": [{"text": new_message}]}
     for event in runner.run(
         user_id=user_id,
         session_id=session_id,
-        new_message=new_message,
+        new_message=payload,
     ):
         latest = event
     return latest
