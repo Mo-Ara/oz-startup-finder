@@ -168,7 +168,7 @@ CSS = """
 .empty-state { color: #6b7280; font-size: 14px; padding: 18px 0; }
 """
 
-with gr.Blocks(title="oz-startup-finder", css=CSS) as demo:
+with gr.Blocks(title="oz-startup-finder") as demo:
     gr.Markdown(
         "# oz-startup-finder\n"
         "Agentic Australian early-stage startup discovery using Google ADK, Gradio, and SQLite FTS5."
@@ -193,5 +193,5 @@ with gr.Blocks(title="oz-startup-finder", css=CSS) as demo:
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", "7860"))
-    demo.launch(server_name="0.0.0.0", server_port=port)
+    port = int(os.environ.get("GRADIO_SERVER_PORT", os.environ.get("PORT", "7860")))
+    demo.launch(server_name="0.0.0.0", server_port=port, css=CSS, share=False)
