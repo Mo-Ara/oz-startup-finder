@@ -101,5 +101,4 @@ def build_retriever_agent(model: str | None = None) -> LlmAgent:
         name="retriever",
         model=model or get_model_name(),
         instruction=instruction,
-        tools=[db_search],
     )

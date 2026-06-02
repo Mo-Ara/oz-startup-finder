@@ -338,7 +338,7 @@ class OzStartupFinderPipeline:
         start = raw.find("{")
         end = raw.rfind("}")
         if start != -1 and end != -1 and end > start:
-            candidate = raw[start : end + 1]
+            candidate = raw[start: end + 1]
             try:
                 return json.loads(candidate)
             except Exception:
