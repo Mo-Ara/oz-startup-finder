@@ -148,59 +148,172 @@ class OzStartupFinderPipeline:
             label="router",
         )
         router_json = _json_from_event_text(router_event)
-        _assign(self.state, "router_output", router_json if isinstance(router_json, dict) else {})
+        router_output = router_json if isinstance(router_json, dict) else {}
+        self.state.router_output = router_output
+
+        strategy = router_output.get("strategy") if isinstance(router_output, dict) else None
+        if not strategy:
+            strategy = "market_scan"
+
+        retrieval_query = user_query
+        if strategy == "company_lookup":
+            company_hint = clarifying_text or user_query
+            retrieval_query = company_hint
+        elif strategy == "competitor_research":
+            retrieval_query = user_query.split("competitor")[0].strip() or user_query
+
+        retrieval_input = json.dumps(
+            {"query": retrieval_query, "strategy": strategy},
+            ensure_ascii=False,
+        )
 
         retrieval_event = await _consume(
             Runner(agent=self.retriever_agent, session_service=self.session_service, app_name="oz-startup-finder"),
             user_id="local-user",
             session_id=f"{self.session_id}:retriever",
-            new_message=user_query,
+            new_message=retrieval_input,
             label="retriever",
         )
-        retrieval_json = _json_from_event_text(retrieval_event)
+        retrieval_text = _text_from_event(retrieval_event)
+        self.state.retrieval_raw_text = retrieval_text
+
+        retrieval_json = self._coerce_retrieval_output(retrieval_text)
         retrieved = retrieval_json.get("top_matches") if isinstance(retrieval_json, dict) else None
-        _assign(self.state, "retrieved_candidates", retrieved or [])
+        if not retrieved:
+            fallback = retrieval_json.get("candidates") if isinstance(retrieval_json, dict) else None
+            if not fallback:
+                fallback_result = retrieval_json.get("results") if isinstance(retrieval_json, dict) else None
+                if isinstance(fallback_result, list):
+                    fallback = [
+                        {
+                            "company_name": item.get("company_name"),
+                            "industry": item.get("industry"),
+                            "company_city": item.get("company_city"),
+                            "match_score": item.get("match_score") or item.get("relevance_score"),
+                            "rationale": item.get("rationale") or item.get("reason"),
+                        }
+                        for item in fallback_result
+                        if item.get("company_name")
+                    ]
+            retrieved = fallback
+        self.state.retrieved_candidates = retrieved or []
 
         if not self.state.retrieved_candidates:
-            logger.info("No retrieval candidates; skipping enrichment/scoring/synthesis.")
-            logger.info("Pipeline incomplete: retrieval returned no candidates")
+            logger.info("No retrieval candidates found for query=%s", user_query)
             return self.state
 
-        enriched: list[dict] = []
+        self.state.enriched_leads = []
         for idx, candidate in enumerate(self.state.retrieved_candidates[:10], start=1):
             label = f"enricher:{idx}"
+            enrichment_input = json.dumps(
+                {
+                    "company": candidate,
+                    "query": user_query,
+                    "strategy": strategy,
+                    "router_output": self.state.router_output,
+                },
+                ensure_ascii=False,
+            )
             enriched_event = await _consume(
                 Runner(agent=self.enricher_agent, session_service=self.session_service, app_name="oz-startup-finder"),
                 user_id="local-user",
                 session_id=f"{self.session_id}:enricher:{candidate.get('company_name', 'unknown')}",
-                new_message=user_query,
+                new_message=enrichment_input,
                 label=label,
             )
             enriched_json = _json_from_event_text(enriched_event)
             payload = enriched_json if isinstance(enriched_json, dict) else {}
             payload.setdefault("company_name", candidate.get("company_name"))
-            enriched.append(payload)
-        _assign(self.state, "enriched_leads", enriched)
+            self.state.enriched_leads.append(payload)
 
+        scorer_input = json.dumps(
+            {
+                "enriched_leads": self.state.enriched_leads,
+                "query": user_query,
+                "strategy": strategy,
+            },
+            ensure_ascii=False,
+        )
+
+        self.state.scored_leads = []
         scorer_event = await _consume(
             Runner(agent=self.scorer_agent, session_service=self.session_service, app_name="oz-startup-finder"),
             user_id="local-user",
             session_id=f"{self.session_id}:scorer",
-            new_message=user_query,
+            new_message=scorer_input,
             label="scorer",
         )
         scorer_json = _json_from_event_text(scorer_event)
-        _assign(self.state, "scored_leads", (scorer_json.get("scored_leads") or []) if isinstance(scorer_json, dict) else [])
+        if isinstance(scorer_json, dict):
+            self.state.scored_leads = scorer_json.get("scored_leads") or scorer_json.get("leads") or []
 
-        synthesizer_event = await _consume(
-            Runner(agent=self.synthesizer_agent, session_service=self.session_service, app_name="oz-startup-finder"),
-            user_id="local-user",
-            session_id=f"{self.session_id}:synthesizer",
-            new_message=user_query,
-            label="synthesizer",
-        )
-        synthesizer_json = _json_from_event_text(synthesizer_event)
-        _assign(self.state, "synthesis", synthesizer_json if isinstance(synthesizer_json, dict) else {})
+        self.state.synthesis = {}
+        synthesis_input_payload = None
+        if self.state.scored_leads:
+            synthesis_input_payload = {
+                "scored_leads": self.state.scored_leads,
+                "query": user_query,
+                "strategy": strategy,
+            }
+        elif self.state.enriched_leads:
+            synthesis_input_payload = {
+                "scored_leads": self.state.enriched_leads,
+                "query": user_query,
+                "strategy": strategy,
+            }
+        if synthesis_input_payload is not None:
+            synthesizer_event = await _consume(
+                Runner(agent=self.synthesizer_agent, session_service=self.session_service, app_name="oz-startup-finder"),
+                user_id="local-user",
+                session_id=f"{self.session_id}:synthesizer",
+                new_message=json.dumps(synthesis_input_payload, ensure_ascii=False),
+                label="synthesizer",
+            )
+            synthesizer_json = _json_from_event_text(synthesizer_event)
+            if isinstance(synthesizer_json, dict) and synthesizer_json.get("leads_json"):
+                self.state.synthesis = synthesizer_json
+            else:
+                self.state.synthesis = self._fallback_synthesis(self.state)
+        else:
+            self.state.synthesis = {}
 
         logger.info("Pipeline complete")
         return self.state
+
+    def _coerce_retrieval_output(self, raw: str) -> Any:
+        if not raw:
+            return {}
+        try:
+            return json.loads(raw)
+        except Exception:
+            pass
+        start = raw.find("{")
+        end = raw.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            candidate = raw[start : end + 1]
+            try:
+                return json.loads(candidate)
+            except Exception:
+                pass
+        return {}
+
+    def _fallback_synthesis(self, state: PipelineState) -> dict[str, Any]:
+        raw_source = state.scored_leads or state.enriched_leads or state.retrieved_candidates
+        leads_json = []
+        for item in raw_source[:20]:
+            leads_json.append(
+                {
+                    "company_name": item.get("company_name"),
+                    "industry": item.get("industry"),
+                    "company_city": item.get("company_city"),
+                    "relevance_narrative": item.get("relevance_narrative") or item.get("rationale") or "Matched by retrieval search.",
+                    "relevance_score": item.get("relevance_score") or item.get("match_score") or 60,
+                    "confidence_score": item.get("confidence") or item.get("confidence_score") or 60,
+                }
+            )
+        summary = (
+            f"Found {len(leads_json)} candidate(s) for your query."
+            if leads_json
+            else "No leads were found in the current dataset."
+        )
+        return {"summary": summary, "leads_json": leads_json}

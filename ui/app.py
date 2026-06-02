@@ -4,7 +4,7 @@ from collections.abc import Sequence
 
 import gradio as gr
 
-from agents.orchestrator import OzStartupFinderPipeline, PipelineState
+from agents.orchestrator import OzStartupFinderPipeline, PipelineState, _json_from_event_text, _text_from_event
 
 
 def build_workflow_steps(state: PipelineState) -> Sequence[str]:
