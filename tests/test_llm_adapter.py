@@ -1,20 +1,17 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 from shared.llm_adapter import chat_completion
 
 
-def _fake_openai(monkeypatch, return_value):
+def _fake_openai(return_value):
     fake = MagicMock()
     fake.chat.completions.create.return_value = return_value
-    monkeypatch.setattr("shared.llm_adapter.OpenAI", lambda api_key, base_url: fake)
     return fake
 
 
-def test_chat_completion_returns_expected_results(monkeypatch):
+def test_chat_completion_returns_expected_results():
     fake_choice = MagicMock()
     fake_choice.message.content = "pong"
     fake_choice.finish_reason = "stop"
@@ -23,12 +20,15 @@ def test_chat_completion_returns_expected_results(monkeypatch):
     fake_response.model = "mock-model"
     fake_response.choices = [fake_choice]
 
-    result = chat_completion(
-        messages=[{"role": "user", "content": "ping"}],
-        api_key="test-key",
-        base_url="https://example.com",
-        model="mock-model",
-    )
+    with patch("shared.llm_adapter.OpenAI") as MockOpenAI:
+        MockOpenAI.return_value = _fake_openai(fake_response)
+        result = chat_completion(
+            messages=[{"role": "user", "content": "ping"}],
+            api_key="test-key",
+            base_url="https://example.com",
+            model="mock-model",
+        )
+
     assert result["content"] == "pong"
     assert result["model"] == "mock-model"
     assert result["finish_reason"] == "stop"

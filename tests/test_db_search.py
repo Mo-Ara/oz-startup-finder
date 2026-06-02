@@ -24,7 +24,7 @@ def test_db_search_respects_max_limit_fifty():
 
 
 def test_db_search_no_results_for_gibberish():
-    result = db_search("zzzznonexistent", db_path=str(DB_PATH))
+    result = db_search("zzzznonexistent", limit=5, db_path=str(DB_PATH))
     assert result["results"] == []
 
 
