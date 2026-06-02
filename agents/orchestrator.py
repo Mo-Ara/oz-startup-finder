@@ -24,6 +24,7 @@ class PipelineState:
     clarifying_questions: list[str] = field(default_factory=list)
     router_output: dict = field(default_factory=dict)
     retrieved_candidates: list[dict] = field(default_factory=list)
+    retrieval_raw_text: str = ""
     enriched_leads: list[dict] = field(default_factory=list)
     scored_leads: list[dict] = field(default_factory=list)
     synthesis: dict = field(default_factory=dict)
@@ -178,24 +179,14 @@ class OzStartupFinderPipeline:
         self.state.retrieval_raw_text = retrieval_text
 
         retrieval_json = self._coerce_retrieval_output(retrieval_text)
-        retrieved = retrieval_json.get("top_matches") if isinstance(retrieval_json, dict) else None
-        if not retrieved:
-            fallback = retrieval_json.get("candidates") if isinstance(retrieval_json, dict) else None
-            if not fallback:
-                fallback_result = retrieval_json.get("results") if isinstance(retrieval_json, dict) else None
-                if isinstance(fallback_result, list):
-                    fallback = [
-                        {
-                            "company_name": item.get("company_name"),
-                            "industry": item.get("industry"),
-                            "company_city": item.get("company_city"),
-                            "match_score": item.get("match_score") or item.get("relevance_score"),
-                            "rationale": item.get("rationale") or item.get("reason"),
-                        }
-                        for item in fallback_result
-                        if item.get("company_name")
-                    ]
-            retrieved = fallback
+        if retrieval_json is None:
+            retrieval_json = {}
+        retrieved = (
+            retrieval_json.get("top_matches")
+            or retrieval_json.get("results")
+            or retrieval_json.get("candidates")
+            or []
+        )
         self.state.retrieved_candidates = retrieved or []
 
         if not self.state.retrieved_candidates:

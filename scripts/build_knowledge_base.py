@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 
-DB_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "startups.db"
+DB_PATH = Path(__file__).resolve().parent.parent / "data" / "startups.db"
 
 
 def build_knowledge_base(csv_path: Path, db_path: Path) -> None:
