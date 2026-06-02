@@ -5,6 +5,7 @@ import threading
 from typing import Any, AsyncIterator, Dict, Iterator, List
 
 from dataclasses import dataclass
+from dotenv import load_dotenv
 from google.adk.models import LLMRegistry, BaseLlm, LlmRequest, LlmResponse
 from google.genai import types
 
