@@ -9,7 +9,8 @@ from dotenv import load_dotenv
 from google.adk.models import LLMRegistry, BaseLlm, LlmRequest, LlmResponse
 from google.genai import types
 
-from shared.llm_adapter import chat_completion as _openrouter_chat_completion
+from shared.llm_adapter import chat_completion as _openrouter_chat_completion_sync
+from shared.llm_adapter import chat_completion_async as _openrouter_chat_completion_async
 
 load_dotenv()
 
