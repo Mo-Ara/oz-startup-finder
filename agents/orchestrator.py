@@ -10,6 +10,7 @@ from agents.scorer.agent import build_scorer_agent
 from agents.synthesizer.agent import build_synthesizer_agent
 from google.adk import Runner
 from google.adk.sessions import InMemorySessionService
+from google.genai import types
 
 
 @dataclass
@@ -30,11 +31,14 @@ async def _create_session(session_service: InMemorySessionService, session_id: s
 async def _consume(runner: Runner, *, user_id: str, session_id: str, new_message: str):
     await _create_session(runner.session_service, session_id)
     latest = None
-    payload = {"role": "user", "parts": [{"text": new_message}]}
+    content = types.Content(
+        role="user",
+        parts=[types.Part(text=new_message)],
+    )
     for event in runner.run(
         user_id=user_id,
         session_id=session_id,
-        new_message=payload,
+        new_message=content,
     ):
         latest = event
     return latest
