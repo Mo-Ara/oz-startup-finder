@@ -1,0 +1,4 @@
+openrouter:
+  model_id: "openrouter/free"
+  base_url: "https://openrouter.ai/api/v1"
+  # api_key is read from .env / Space secrets; do not hardcode here.

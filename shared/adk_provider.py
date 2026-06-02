@@ -17,8 +17,8 @@ _registered = False
 
 def _effective_model() -> str:
     raw = os.getenv("OPENROUTER_MODEL", "openrouter/free").strip()
-    if not raw.startswith("openrouter/"):
-        raw = f"openrouter/{raw}"
+    if not raw:
+        raw = "openrouter/free"
     return raw
 
 
