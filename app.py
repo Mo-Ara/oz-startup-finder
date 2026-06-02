@@ -24,6 +24,8 @@ try:
         print("ADK_DIAG Runner.run signature:", getattr(Runner.run, "__code__", None))
     if hasattr(Runner, "run_async"):
         print("ADK_DIAG Runner.run_async signature:", getattr(Runner.run_async, "__code__", None))
+    append_sig = getattr(Runner, "_append_new_message_to_session", None)
+    print("ADK_DIAG Runner._append_new_message_to_session:", getattr(append_sig, "__code__", append_sig))
 except Exception as exc:  # pragma: no cover - diagnostic only
     print("ADK_DIAG Runner inspection failed:", exc)
 
@@ -32,6 +34,12 @@ try:
     print("ADK_DIAG LlmAgent fields:", getattr(LlmAgent, "model_fields", None))
 except Exception as exc:  # pragma: no cover - diagnostic only
     print("ADK_DIAG LlmAgent inspection failed:", exc)
+
+try:
+    from google.adk.runners import InvocationContext
+    print("ADK_DIAG InvocationContext fields:", getattr(InvocationContext, "model_fields", None))
+except Exception as exc:  # pragma: no cover - diagnostic only
+    print("ADK_DIAG InvocationContext inspection failed:", exc)
 
 import gradio as gr  # noqa: E402
 from agents.orchestrator import OzStartupFinderPipeline  # noqa: E402
