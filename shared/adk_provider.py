@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import os
 import threading
-from typing import Any, AsyncIterator, Dict, Iterator, List
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, Iterator, List
 
 from dataclasses import dataclass
 from dotenv import load_dotenv
 from google.adk.models import LLMRegistry, BaseLlm, LlmRequest, LlmResponse
 from google.genai import types
+
+if TYPE_CHECKING:
+    from openai import AsyncOpenAI
+    from openai import OpenAI
 
 load_dotenv()
 
@@ -49,10 +53,38 @@ class _OpenRouterLlm(BaseLlm):
         c = _cfg()
         self._key = c.api_key
         self._base = c.base_url.rstrip("/")
+        self._async_client: AsyncOpenAI | None = None
+        self._sync_client: OpenAI | None = None
 
     @property
     def support_system_prompt(self) -> bool:
         return True
+
+    def _async_client_impl(self) -> AsyncOpenAI:
+        if self._async_client is None:
+            if not self._key:
+                raise RuntimeError(
+                    "OPENROUTER_API_KEY is not set. "
+                    "Set it in .env or Space secrets."
+                )
+            self._async_client = AsyncOpenAI(
+                api_key=self._key,
+                base_url=self._base,
+            )
+        return self._async_client
+
+    def _sync_client_impl(self) -> OpenAI:
+        if self._sync_client is None:
+            if not self._key:
+                raise RuntimeError(
+                    "OPENROUTER_API_KEY is not set. "
+                    "Set it in .env or Space secrets."
+                )
+            self._sync_client = OpenAI(
+                api_key=self._key,
+                base_url=self._base,
+            )
+        return self._sync_client
 
     def _msgs(self, llm_request: LlmRequest) -> List[Dict[str, str]]:
         messages: List[Dict[str, str]] = []
@@ -83,26 +115,19 @@ class _OpenRouterLlm(BaseLlm):
         llm_request: LlmRequest,
         stream: bool = False,
     ) -> AsyncIterator[LlmResponse]:
-        from openai import AsyncOpenAI
-
-        if not self._key:
-            raise RuntimeError(
-                "OPENROUTER_API_KEY is not set. "
-                "Set it in .env or Space secrets."
-            )
-
-        client = AsyncOpenAI(
-            api_key=self._key,
-            base_url=self._base,
-        )
         messages = self._msgs(llm_request)
         model = _effective_model()
 
+        client = self._async_client_impl()
+
         async def _run() -> AsyncIterator[LlmResponse]:
-            response = await client.chat.completions.create(
-                model=model,
-                messages=messages,
-            )
+            try:
+                response = await client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                )
+            except Exception as exc:
+                raise RuntimeError(f"OpenRouter request failed: {exc}") from exc
             text = response.choices[0].message.content or ""
             yield LlmResponse(
                 content=types.Content(
@@ -118,20 +143,10 @@ class _OpenRouterLlm(BaseLlm):
         llm_request: LlmRequest,
         stream: bool = False,
     ) -> Iterator[LlmResponse]:
-        from openai import OpenAI
-
-        if not self._key:
-            raise RuntimeError(
-                "OPENROUTER_API_KEY is not set. "
-                "Set it in .env or Space secrets."
-            )
-
-        client = OpenAI(
-            api_key=self._key,
-            base_url=self._base,
-        )
         messages = self._msgs(llm_request)
         model = _effective_model()
+
+        client = self._sync_client_impl()
 
         def _run() -> Iterator[LlmResponse]:
             response = client.chat.completions.create(
