@@ -35,15 +35,11 @@ async def _consume(runner: Runner, *, user_id: str, session_id: str, new_message
         role="user",
         parts=[types.Part(text=new_message)],
     )
-    try:
-        gen = runner.run(
-            user_id=user_id,
-            session_id=session_id,
-            new_message=content,
-        )
-    except Exception as exc:
-        raise RuntimeError(f"Runner.run failed before streaming events: {exc}") from exc
-    for event in gen:
+    async for event in runner.run_async(
+        user_id=user_id,
+        session_id=session_id,
+        new_message=content,
+    ):
         latest = event
     return latest
 
