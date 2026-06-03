@@ -146,11 +146,17 @@ cython_debug/
 .DS_Store
 Thumbs.db
 
-# Data — NEVER commit raw data or generated DBs
+# Data — NEVER commit raw data or generated DBs, but keep encrypted DB
 data/*.csv
 data/*.db
 data/*.sqlite
+data/*.bak
+!data/startups.enc
 !data/.gitkeep
+
+# Secrets / keys
+*.key
+db.key
 
 # Docker
 docker-compose.override.yml

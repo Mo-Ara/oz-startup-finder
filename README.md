@@ -47,9 +47,19 @@ Gradio UI -> table + cards + CSV export
 
 ## Data
 
-Private company data is **not** in this repo.
-Build `data/startups.db` locally with `scripts/seed_demo.py` or `scripts/build_knowledge_base.py`.
-`data/*.db` and `data/*.csv` are gitignored.
+Private company data is not shipped in this repo.
+This app is a read-only client against an encrypted SQLite database.
+
+One-time local setup:
+1. `python -m scripts.build_knowledge_base path/to/companies.csv data/startups.db`
+2. `PYTHONPATH=. python -c "...encrypt script..."` to create `data/startups.enc`
+3. Store the Fernet key in HF Secrets as `DB_ENCRYPTION_KEY`
+4. Push `data/startups.enc`; do not push the CSV or plaintext DB.
+
+Local run:
+```bash
+STARTUP_DB_PATH=./data/startups.db OPENROUTER_API_KEY=... python app.py
+```
 
 ## Quick Start
 

@@ -9,8 +9,27 @@ from typing import Any
 DB_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "startups.db"
 
 
+ALLOWED_DB_PATH_ENV_VARS = [
+    "STARTUP_DB_PATH",
+    "OZ_STARTUP_DB_PATH",
+    "DATABASE_URL",
+]
+
+
+def _resolve_db_path(db_path: str | Path | None = None) -> Path:
+    if db_path:
+        return Path(db_path)
+
+    for key in ALLOWED_DB_PATH_ENV_VARS:
+        value = os.environ.get(key)
+        if value:
+            return Path(value)
+
+    return DB_PATH
+
+
 def get_connection(db_path: str | Path | None = None) -> sqlite3.Connection:
-    path = Path(db_path) if db_path else DB_PATH
+    path = _resolve_db_path(db_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(path))
     conn.row_factory = sqlite3.Row

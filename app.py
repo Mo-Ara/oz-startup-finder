@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import os
 import sys
+import tempfile
 import traceback
+from pathlib import Path
 from typing import Any
 
 REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -12,6 +14,22 @@ if REPO_ROOT not in sys.path:
 import gradio as gr  # noqa: E402
 
 from agents.orchestrator import OzStartupFinderPipeline, PipelineState  # noqa: E402
+
+
+def _decrypt_startup_db() -> Path:
+    enc_path = Path(REPO_ROOT) / "data" / "startups.enc"
+    if not enc_path.exists():
+        raise FileNotFoundError(f"Encrypted DB not found at {enc_path}")
+    key = os.environ.get("DB_ENCRYPTION_KEY")
+    if not key:
+        raise EnvironmentError("DB_ENCRYPTION_KEY secret is not set")
+    db_path = Path(tempfile.gettempdir()) / "startups.db"
+    db_path.write_bytes(
+        __import__("cryptography.fernet", fromlist=["Fernet"])
+        .Fernet(key.encode())
+        .decrypt(enc_path.read_bytes())
+    )
+    return db_path
 
 
 def _maybe_json(obj: Any) -> str:
@@ -241,5 +259,7 @@ with gr.Blocks(title="oz-startup-finder") as demo:
     )
 
 if __name__ == "__main__":
+    db_path = _decrypt_startup_db()
+    os.environ.setdefault("STARTUP_DB_PATH", str(db_path))
     port = int(os.environ.get("GRADIO_SERVER_PORT", os.environ.get("PORT", "7860")))
     demo.launch(server_name="0.0.0.0", server_port=port, css=CSS, share=False)
