@@ -6,7 +6,7 @@
 
 Agentic Australian early-stage startup discovery using Google ADK, Gradio, and SQLite FTS5 — free tier end to end.
 
-![Architecture overview](https://via.placeholder.com/1200x360/0b1220/e6edf3?text=Clarify+%E2%86%92+Router+%E2%86%92+Retrieval+%E2%86%92+Enrichment+%E2%86%92+Scoring+%E2%86%92+Synthesis)
+![Architecture overview](https://placehold.co/1200x360/0b1220/e6edf3?text=Clarify+%E2%86%92+Router+%E2%86%92+Retrieval+%E2%86%92+Enrichment+%E2%86%92+Scoring+%E2%86%92+Synthesis)
 
 ## Demo
 
