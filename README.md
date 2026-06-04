@@ -18,6 +18,10 @@ Agentic Australian early-stage startup discovery using Google ADK, Gradio, and S
 
 ![Architecture overview](https://via.placeholder.com/1200x360/0b1220/e6edf3?text=Clarify+%E2%86%92+Router+%E2%86%92+Retrieval+%E2%86%92+Enrichment+%E2%86%92+Scoring+%E2%86%92+Synthesis)
 
+## Demo
+
+![Demo GIF](https://via.placeholder.com/1100x520/0b1220/e6edf3?text=30s+walkthrough+GIF+placeholder)
+
 ## Why this repo exists
 
 This project is a portfolio example showing seven Google ADK agent patterns in a single coherent workflow:
