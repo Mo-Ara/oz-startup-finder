@@ -1,12 +1,20 @@
+---
+title: oz-startup-finder
+emoji: 🔍
+colorFrom: blue
+colorTo: purple
+sdk: gradio
+app_file: app.py
+pinned: false
+---
+
 # oz-startup-finder
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![CI Build](https://img.shields.io/github/actions/workflow/status/Mo-Ara/oz-startup-finder/ci.yml?label=CI)](https://github.com/oz-startup-finder/.github/workflows/ci.yml)
 [![Live Demo](https://img.shields.io/badge/Live_Demo-HuggingFace_Space-ffd43f.svg)](https://huggingface.co/spaces/Mo-Ara/oz-startup-finder)
 
-Agentic Australian early-stage startup discovery using Google ADK, Gradio, and SQLite FTS5 — free tier end to end.
-
-![Architecture overview](https://placehold.co/1200x360/0b1220/e6edf3?text=Clarify+%E2%86%92+Router+%E2%86%92+Retrieval+%E2%86%92+Enrichment+%E2%86%92+Scoring+%E2%86%92+Synthesis)
+Agentic Australian early-stage startup discovery using Google ADK, Gradio, and SQLite FTS5.
 
 ## Demo
 
