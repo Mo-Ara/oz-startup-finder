@@ -20,7 +20,8 @@ Agentic Australian early-stage startup discovery using Google ADK, Gradio, and S
 
 ## Demo
 
-![Demo GIF](https://via.placeholder.com/1100x520/0b1220/e6edf3?text=30s+walkthrough+GIF+placeholder)
+<img width="1280" height="587" alt="oz-startup-finder-demo" src="https://github.com/user-attachments/assets/3948db6a-1fd5-42d1-a845-212f3a74ad20" />
+
 
 ## Why this repo exists
 
